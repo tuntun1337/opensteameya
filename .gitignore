@@ -1,0 +1,8 @@
+bin/
+obj/
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+node_modules_temp/

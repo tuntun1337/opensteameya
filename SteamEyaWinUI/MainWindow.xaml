@@ -1,0 +1,620 @@
+<Window
+    x:Class="SteamEyaWinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Steam EYA">
+
+    <NavigationView
+        x:Name="RootNavigationView"
+        PaneDisplayMode="Left"
+        OpenPaneLength="168"
+        CompactPaneLength="48"
+        IsSettingsVisible="False"
+        IsBackButtonVisible="Collapsed"
+        Background="Transparent"
+        SelectionChanged="RootNavigationView_SelectionChanged">
+        <NavigationView.MenuItems>
+            <NavigationViewItem
+                x:Name="LoginNavItem"
+                Content="登录"
+                Tag="login">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE8D4;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+
+            <NavigationViewItem
+                x:Name="HistoryNavItem"
+                Content="历史账号"
+                Tag="history">
+                <NavigationViewItem.Icon>
+                    <FontIcon Glyph="&#xE77B;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+
+        <Grid
+            MinWidth="1040"
+            MinHeight="700"
+            Background="Transparent">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid
+                x:Name="LoginPage"
+                Padding="24"
+                RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Text="Steam EYA"
+                    FontSize="20"
+                    FontWeight="SemiBold" />
+
+                <ScrollViewer
+                    Grid.Row="1"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel
+                            Spacing="14"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Top">
+
+                        <StackPanel Orientation="Horizontal" Spacing="18">
+                            <RadioButton
+                                x:Name="ManualModeRadio"
+                                GroupName="Mode"
+                                Content="手动模式"
+                                IsChecked="True"
+                                Checked="ModeRadioButton_Checked" />
+                            <RadioButton
+                                x:Name="AutoModeRadio"
+                                GroupName="Mode"
+                                Content="自动模式"
+                                Checked="ModeRadioButton_Checked" />
+                        </StackPanel>
+
+                        <StackPanel
+                            x:Name="ManualPanel"
+                            Spacing="10">
+                            <TextBox
+                                x:Name="AccountNameBox"
+                                HorizontalAlignment="Stretch"
+                                Header="账户名称"
+                                PlaceholderText="输入 Steam 账户名称"
+                                TextChanged="ManualCredentialBox_TextChanged" />
+
+                            <TextBox
+                                x:Name="EyaTokenBox"
+                                Height="168"
+                                HorizontalAlignment="Stretch"
+                                Header="EYA 令牌"
+                                PlaceholderText="输入 EYA 令牌"
+                                AcceptsReturn="True"
+                                TextWrapping="Wrap"
+                                TextChanged="ManualCredentialBox_TextChanged" />
+                        </StackPanel>
+
+                        <StackPanel
+                            x:Name="AutoPanel"
+                            Spacing="10"
+                            Visibility="Collapsed">
+                            <ComboBox
+                                x:Name="UpstreamServerBox"
+                                HorizontalAlignment="Stretch"
+                                Header="上游服务器"
+                                DisplayMemberPath="Name"
+                                SelectionChanged="UpstreamServerBox_SelectionChanged" />
+
+                            <TextBox
+                                x:Name="LicenseKeyBox"
+                                HorizontalAlignment="Stretch"
+                                Header="卡密"
+                                PlaceholderText="输入卡密"
+                                TextChanged="LicenseKeyBox_TextChanged" />
+
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox
+                                    x:Name="ResolvedAccountBox"
+                                    Header="解析账户"
+                                    IsReadOnly="True"
+                                    PlaceholderText="未解析" />
+
+                                <Button
+                                    x:Name="ResolveLicenseButton"
+                                    Grid.Column="1"
+                                    MinWidth="112"
+                                    VerticalAlignment="Bottom"
+                                    Click="ResolveLicenseButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE721;" FontSize="16" />
+                                        <TextBlock Text="解析卡密" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button
+                                x:Name="ClearWorkshopButton"
+                                HorizontalAlignment="Stretch"
+                                Click="ClearWorkshopButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="16" />
+                                    <TextBlock Text="清除创意工坊订阅" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                x:Name="LoginButton"
+                                Grid.Column="1"
+                                HorizontalAlignment="Stretch"
+                                Click="LoginButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE8D4;" FontSize="16" />
+                                    <TextBlock Text="登录到 Steam" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border
+                        Grid.Column="1"
+                        Padding="16"
+                        CornerRadius="8"
+                        BorderThickness="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        VerticalAlignment="Stretch">
+                        <StackPanel Spacing="12">
+                            <TextBlock
+                                Text="账号信息"
+                                FontSize="18"
+                                FontWeight="SemiBold" />
+
+                            <StackPanel
+                                Spacing="8"
+                                HorizontalAlignment="Center">
+                                <PersonPicture
+                                    x:Name="AccountInfoAvatar"
+                                    Width="76"
+                                    Height="76"
+                                    DisplayName="未填写" />
+                                <TextBlock
+                                    x:Name="AccountInfoPersonaText"
+                                    Text="Steam 昵称未同步"
+                                    HorizontalAlignment="Center"
+                                    TextWrapping="Wrap"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="用户名"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoUserText"
+                                    Text="未填写"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="Steam64"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoSteamIdText"
+                                    Text="未解析"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="JWT 过期时间"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoExpiresText"
+                                    Text="未解析"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="可用状态"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoAvailabilityText"
+                                Text="未验证"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="优先分数"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoPremierScoreText"
+                                    Text="未查询"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="CS2等级"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoCsLevelText"
+                                    Text="未查询"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="3">
+                                <TextBlock
+                                    Text="冷却状态"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock
+                                    x:Name="AccountInfoCooldownStatusText"
+                                    Text="未查询"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button
+                                x:Name="OneClickQueryButton"
+                                HorizontalAlignment="Stretch"
+                                Click="OneClickQueryButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE9D9;" FontSize="16" />
+                                    <TextBlock Text="一键查询" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid
+                x:Name="HistoryPage"
+                Padding="24"
+                RowSpacing="16"
+                Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <TextBlock
+                        Text="历史账号"
+                        FontSize="20"
+                        FontWeight="SemiBold"
+                        VerticalAlignment="Center" />
+
+                    <Button
+                        x:Name="RefreshHistoryButton"
+                        HorizontalAlignment="Right"
+                        Click="RefreshHistoryButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" FontSize="16" />
+                            <TextBlock Text="刷新" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Grid
+                    Grid.Row="1"
+                    ColumnSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid>
+                        <ListView
+                            x:Name="HistoryAccountList"
+                            SelectionMode="Single"
+                            IsItemClickEnabled="True"
+                            ItemClick="HistoryAccountList_ItemClick"
+                            SelectionChanged="HistoryAccountList_SelectionChanged">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,8"
+                                        Padding="14"
+                                        CornerRadius="8"
+                                        BorderThickness="1"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                        <Grid
+                                            MinHeight="72"
+                                            ColumnSpacing="14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <PersonPicture
+                                                Width="58"
+                                                Height="58"
+                                                DisplayName="{Binding AccountTitle}"
+                                                ProfilePicture="{Binding AvatarImage}" />
+
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                Spacing="4"
+                                                VerticalAlignment="Center">
+                                                <TextBlock
+                                                    Text="{Binding AccountTitle}"
+                                                    FontSize="16"
+                                                    FontWeight="SemiBold"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Text="{Binding PersonaDisplayName}"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Text="{Binding SteamIdDisplay}"
+                                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    Text="{Binding CooldownSummaryText}"
+                                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <StackPanel
+                                                Grid.Column="2"
+                                                MinWidth="86"
+                                                Spacing="4"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Right">
+                                                <TextBlock
+                                                    Text="上次登录"
+                                                    HorizontalAlignment="Right"
+                                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock
+                                                    Text="{Binding LastLoginShortText}"
+                                                    HorizontalAlignment="Right" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <Border
+                            x:Name="HistoryEmptyPanel"
+                            Padding="24"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Visibility="Collapsed">
+                            <TextBlock
+                                Text="暂无历史账号"
+                                FontSize="16"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <ScrollViewer
+                        Grid.Column="1"
+                        VerticalScrollBarVisibility="Auto">
+                        <Border
+                            Padding="18"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="16">
+                                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                                    <PersonPicture
+                                        x:Name="HistoryDetailAvatar"
+                                        Width="92"
+                                        Height="92"
+                                        DisplayName="未选择" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailAccountNameText"
+                                        Text="未选择账号"
+                                        FontSize="20"
+                                        FontWeight="SemiBold"
+                                        HorizontalAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailPersonaText"
+                                        Text="Steam 资料未同步"
+                                        HorizontalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <Grid RowSpacing="10" ColumnSpacing="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="112" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock
+                                        Text="Steam64"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailSteamIdText"
+                                        Grid.Column="1"
+                                        Text="未解析"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        Text="JWT 过期"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailTokenExpiresText"
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        Text="未解析"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Text="上次登录"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailLastLoginText"
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        Text="暂无记录"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="3"
+                                        Text="优先分数"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailCompetitiveScoreText"
+                                        Grid.Row="3"
+                                        Grid.Column="1"
+                                        Text="待查询"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="4"
+                                        Text="CS2等级"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailCsLevelText"
+                                        Grid.Row="4"
+                                        Grid.Column="1"
+                                        Text="待查询"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="5"
+                                        Text="冷却状态"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailCooldownStatusText"
+                                        Grid.Row="5"
+                                        Grid.Column="1"
+                                        Text="待查询"
+                                        TextWrapping="Wrap" />
+
+                                    <TextBlock
+                                        Grid.Row="6"
+                                        Text="JWT可用状态"
+                                        Style="{ThemeResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock
+                                        x:Name="HistoryDetailAccountStatusText"
+                                        Grid.Row="6"
+                                        Grid.Column="1"
+                                        Text="待查询"
+                                        TextWrapping="Wrap" />
+                                </Grid>
+
+                                <Button
+                                    x:Name="OneClickHistoryQueryButton"
+                                    HorizontalAlignment="Stretch"
+                                    Click="OneClickHistoryQueryButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="16" />
+                                        <TextBlock Text="一键查询" />
+                                    </StackPanel>
+                                </Button>
+
+                                <Button
+                                    x:Name="UseHistoryAccountButton"
+                                    HorizontalAlignment="Stretch"
+                                    Click="UseHistoryAccountButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8E5;" FontSize="16" />
+                                        <TextBlock Text="载入到登录页" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <Grid
+                Grid.Row="1"
+                MinHeight="48"
+                Margin="24,0,24,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ProgressRing
+                    x:Name="BusyRing"
+                    Width="18"
+                    Height="18"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    IsActive="False"
+                    Visibility="Collapsed" />
+                <InfoBar
+                    x:Name="StatusInfoBar"
+                    Grid.Column="1"
+                    IsOpen="True"
+                    IsClosable="False"
+                    Severity="Informational"
+                    Message="准备就绪" />
+            </Grid>
+        </Grid>
+    </NavigationView>
+</Window>
