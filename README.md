@@ -27,6 +27,8 @@ SteamEYA 是一个 WinUI 3 桌面工具，用于通过 EYA 令牌登录 Steam、
 3. 解压到一个普通目录，不要直接在压缩包内运行。
 4. 双击 `SteamEyaWinUI.exe`。
 
+发布包不做自解压，避免弹出 7-Zip SFX 解压框。
+
 ## 发版规则
 
 每次向 `main` 分支推送都会自动创建一个 Release。

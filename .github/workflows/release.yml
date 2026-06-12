@@ -144,6 +144,7 @@ jobs:
             artifactName = $artifactName
             artifactSize = $artifact.Length
             artifactSha256 = $sha256
+            artifactType = "7z-archive"
             changelog = $changelog
           }
           $metadata | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $metadataPath -Encoding UTF8
