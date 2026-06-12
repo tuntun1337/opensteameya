@@ -22,7 +22,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5.3.0
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Generate release metadata
         id: meta
@@ -54,7 +54,7 @@ jobs:
             "# SteamEYA $tag"
             ""
             "版本号：``$tag``"
-            "平台：``Windows x64``"
+            "平台：``Windows x64``（Native AOT 原生编译 + 自包含）"
             "提交：``$shortSha``"
             ""
             "## 更新日志"
@@ -62,9 +62,8 @@ jobs:
             ""
             "## 运行依赖"
             "- Windows 10 1809 / Windows 11，x64。"
-            "- .NET 8 Desktop Runtime x64。"
-            "- Windows App Runtime / Windows App SDK Runtime。"
             "- 7-Zip 或 NanaZip，用于解压 ``.7z`` 发布包。"
+            "- 无需安装任何运行时：Native AOT 原生编译 + Windows App SDK 自包含，解压即用。"
           ) | Set-Content -LiteralPath $notesPath -Encoding UTF8
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -74,12 +73,15 @@ jobs:
           "changelog_path=$changelogPath" >> $env:GITHUB_OUTPUT
 
       - name: Restore
-        run: dotnet restore .\SteamEyaWinUI.sln
+        run: dotnet restore .\SteamEyaWinUI\SteamEyaWinUI.csproj -r win-x64 -p:Platform=x64
 
-      - name: Build Windows x64
+      - name: Publish Windows x64 (Native AOT)
         run: >
-          dotnet build .\SteamEyaWinUI\SteamEyaWinUI.csproj
+          dotnet publish .\SteamEyaWinUI\SteamEyaWinUI.csproj
           --configuration Release
+          --runtime win-x64
+          --no-restore
+          -p:Platform=x64
           --output .\artifacts\build\win-x64
           -p:Version=${{ steps.meta.outputs.version }}
           -p:FileVersion=${{ steps.meta.outputs.version }}.0
@@ -95,29 +97,14 @@ jobs:
           $metadataPath = Join-Path $PWD "artifacts\latest.json"
           $packageDir = Join-Path $PWD "artifacts\build\win-x64"
 
+          # Native AOT 产物：exe 内含全部托管代码，剔除符号与未使用的 WebView2 组件。
           Get-ChildItem -LiteralPath $packageDir -Filter "*.pdb" -File | Remove-Item -Force
           foreach ($pattern in @(
             "Microsoft.Web.WebView2.Core*.dll",
-            "Microsoft.ML.OnnxRuntime.dll",
-            "System.Numerics.Tensors.dll"
+            "WebView2Loader.dll"
           )) {
             Get-ChildItem -LiteralPath $packageDir -Filter $pattern -File | Remove-Item -Force
           }
-
-          $runtimeRoot = Join-Path $packageDir "runtimes"
-          if (Test-Path -LiteralPath $runtimeRoot) {
-            Get-ChildItem -LiteralPath $runtimeRoot -Directory |
-              Where-Object { $_.Name -ne "win-x64" } |
-              Remove-Item -Recurse -Force
-          }
-
-          $keepDirs = @("Microsoft.UI.Xaml", "runtimes", "zh-CN")
-          Get-ChildItem -LiteralPath $packageDir -Directory |
-            Where-Object {
-              $_.Name -match "^[a-z]{2}(-[A-Za-z0-9]+){0,2}$" -and
-              $_.Name -notin $keepDirs
-            } |
-            Remove-Item -Recurse -Force
 
           $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
           if (-not $sevenZip) {
@@ -129,8 +116,9 @@ jobs:
 
           & $sevenZip a -t7z -mx=9 -mmt=on $artifactPath "$packageDir\*"
           $artifact = Get-Item -LiteralPath $artifactPath
-          if ($artifact.Length -gt 8MB) {
-            throw "Release artifact is $([math]::Round($artifact.Length / 1MB, 2)) MB, larger than the 8 MB limit."
+          # 自包含发布含 Windows App SDK 运行时 DLL，约 15 MB；25 MB 上限用于及早发现意外膨胀。
+          if ($artifact.Length -gt 25MB) {
+            throw "Release artifact is $([math]::Round($artifact.Length / 1MB, 2)) MB, larger than the 25 MB limit."
           }
 
           $sha256 = (Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash.ToLowerInvariant()

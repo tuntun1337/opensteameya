@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <!-- net10.0：net8.0 的 Native AOT 有 WinUI GC 挂死缺陷（dotnet/runtime#104582，.NET 9+ 才修复）。 -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>SteamEyaWinUI</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -14,6 +15,21 @@
     <InformationalVersion>v0.1.0-dev</InformationalVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Native AOT 发布（dotnet publish -r win-x64 -p:Platform=x64 时生效）。
+         按 Windows App SDK 指引，PublishAot 需写在项目文件里以便还原期生效。 -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- CsWinRT 源生成器可能产出 unsafe 代码（CsWinRT#1721）。 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 对跨 WinRT ABI 但未标 partial 的类型给出编译期警告。 -->
+    <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
+    <!-- 禁止反射式 System.Text.Json，意外引入时在开发期即失败而不是 AOT 产物上炸。 -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <!-- 自包含：把 Windows App SDK 运行时 DLL 一并打包到发布目录，
+         用户电脑无需安装 Windows App Runtime，配合 Native AOT 实现真正零运行时依赖。 -->
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +42,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <!-- 只引用 WinUI 组件包（自动带 Foundation/Base/InteractiveExperiences），
+         避免 WindowsAppSDK 元包拖入 onnxruntime/DirectML/AI 等无用载荷（约 40 MB）。
+         自包含模式下 WinUI 组件包自带运行时 DLL，无需 Runtime 包。 -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.2.1" />
   </ItemGroup>
+
+  <!-- workaround：无打包 WinUI 应用 dotnet publish 时不会复制 PRI 资源索引文件，
+       缺少它会在启动时抛 XamlParseException。 -->
+  <Target Name="IncludeWinUIPriInPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish
+        Include="$(TargetDir)$(TargetName).pri"
+        RelativePath="$(TargetName).pri"
+        CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>

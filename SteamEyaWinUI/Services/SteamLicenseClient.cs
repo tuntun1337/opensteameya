@@ -7,7 +7,8 @@ namespace SteamEyaWinUI.Services;
 
 internal sealed record SteamAccountData(string Token, string User, string SteamId);
 
-internal sealed record SteamUpstreamServer(string Name, string BaseUrl)
+// partial：实例会作为 ComboBox ItemsSource 跨越 WinRT ABI，需要 CsWinRT 源生成 vtable（AOT）。
+internal sealed partial record SteamUpstreamServer(string Name, string BaseUrl)
 {
     public override string ToString() => Name;
 }
@@ -22,12 +23,14 @@ internal sealed class SteamLicenseClient
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    public static IReadOnlyList<SteamUpstreamServer> Servers { get; } =
-    [
+    // 用 List 而不是集合表达式：[...] 生成的 <>z__ReadOnlyArray 无法跨 WinRT ABI
+    // 传给 ComboBox.ItemsSource（CsWinRT 已知限制），运行时抛 ArgumentException。
+    public static IReadOnlyList<SteamUpstreamServer> Servers { get; } = new List<SteamUpstreamServer>
+    {
         new("奶味", "http://111.170.18.37:9099"),
         new("伊万", "http://70.39.201.195:9099"),
         new("路飞", "http://38.76.193.80:9099")
-    ];
+    };
 
     public async Task<SteamAccountData> GetAccountDataAsync(
         string licenseKey,

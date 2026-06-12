@@ -3,7 +3,8 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace SteamEyaWinUI.Models;
 
-public sealed class SteamAccountHistoryItem
+// partial：实例会作为 ListView ItemsSource 跨越 WinRT ABI，需要 CsWinRT 源生成 vtable（AOT）。
+public sealed partial class SteamAccountHistoryItem
 {
     private const int MinimumPremierLevel = 10;
 

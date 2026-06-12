@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using SteamEyaWinUI.Models;
 
@@ -16,11 +17,6 @@ internal sealed class AccountHistoryService
     private static readonly HttpClient DefaultHttpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(6)
-    };
-
-    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
     };
 
     public AccountHistoryService()
@@ -197,7 +193,7 @@ internal sealed class AccountHistoryService
         try
         {
             var json = File.ReadAllText(HistoryFilePath);
-            var document = JsonSerializer.Deserialize<AccountHistoryDocument>(json, _jsonOptions)
+            var document = JsonSerializer.Deserialize(json, AccountHistoryJsonContext.Default.AccountHistoryDocument)
                 ?? new AccountHistoryDocument();
             document.Accounts ??= [];
             return document;
@@ -358,16 +354,26 @@ internal sealed class AccountHistoryService
     private void WriteDocument(AccountHistoryDocument document)
     {
         Directory.CreateDirectory(HistoryFolderPath);
-        var json = JsonSerializer.Serialize(document, _jsonOptions);
-        File.WriteAllText(HistoryFilePath, json);
-    }
+        var json = JsonSerializer.Serialize(document, AccountHistoryJsonContext.Default.AccountHistoryDocument);
 
-    private sealed class AccountHistoryDocument
-    {
-        public int Version { get; set; } = 1;
-
-        public List<SteamAccountHistoryItem> Accounts { get; set; } = [];
+        // 先写临时文件再原子替换，避免进程中断导致 accounts.json 半截损坏、下次保存清空全部历史。
+        var tempPath = HistoryFilePath + ".tmp";
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, HistoryFilePath, overwrite: true);
     }
 
     private sealed record SteamProfileData(string? PersonaName, string? AvatarUrl);
 }
+
+internal sealed class AccountHistoryDocument
+{
+    public int Version { get; set; } = 1;
+
+    public List<SteamAccountHistoryItem> Accounts { get; set; } = [];
+}
+
+// JsonSerializerDefaults.Web 与旧版反射序列化保持一致：camelCase 属性名、大小写不敏感读取，
+// 保证现有 accounts.json 在 AOT 下继续可读写。
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web, WriteIndented = true)]
+[JsonSerializable(typeof(AccountHistoryDocument))]
+internal sealed partial class AccountHistoryJsonContext : JsonSerializerContext;
