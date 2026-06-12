@@ -1,0 +1,117 @@
+<Page
+    x:Class="SteamEyaWinUI.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Required">
+
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto"
+        Padding="32,24,32,16">
+        <StackPanel MaxWidth="820" Spacing="16" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                <Border
+                    Width="88"
+                    Height="88"
+                    CornerRadius="{ThemeResource OverlayCornerRadius}"
+                    BorderThickness="1"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                    <Image Source="ms-appx:///Assets/Logo.png" Stretch="UniformToFill" />
+                </Border>
+
+                <StackPanel Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="SteamEYA" Style="{StaticResource PageTitleTextStyle}" />
+                    <TextBlock
+                        x:Name="AboutVersionText"
+                        Text="当前版本：读取中"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        Text="通过 EYA 令牌登录 Steam、清理创意工坊订阅、查询账号状态。"
+                        Style="{StaticResource PageSubtitleTextStyle}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="12">
+                    <Grid>
+                        <TextBlock Text="自动更新" Style="{StaticResource SectionTitleTextStyle}" />
+                        <ProgressRing
+                            x:Name="UpdateCheckingRing"
+                            Width="18"
+                            Height="18"
+                            HorizontalAlignment="Right"
+                            IsActive="False"
+                            Visibility="Collapsed" />
+                    </Grid>
+
+                    <TextBlock
+                        x:Name="AboutUpdateStatusText"
+                        Text="启动时会自动检查 GitHub Releases。"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="AboutArtifactText"
+                        Text="最新成品：未检查"
+                        Style="{StaticResource FieldLabelTextStyle}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="AboutUpdateCheckedText"
+                        Text="检查时间：未检查"
+                        Style="{StaticResource FieldLabelTextStyle}"
+                        TextWrapping="Wrap" />
+                    <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+                        <TextBlock
+                            x:Name="AboutChangelogText"
+                            Text="更新日志：未检查"
+                            TextWrapping="Wrap" />
+                    </ScrollViewer>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="CheckUpdateButton" Click="CheckUpdateButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE895;" FontSize="16" />
+                                <TextBlock Text="检查更新" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            x:Name="DownloadUpdateButton"
+                            IsEnabled="False"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="DownloadUpdateButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE896;" FontSize="16" />
+                                <TextBlock Text="下载更新" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="OpenReleaseButton" Click="OpenReleaseButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="16" />
+                                <TextBlock Text="发布页" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="开源仓库" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock
+                        Text="https://github.com/tuntun1337/opensteameya"
+                        IsTextSelectionEnabled="True"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Name="OpenGitHubButton"
+                        HorizontalAlignment="Left"
+                        Click="OpenGitHubButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE774;" FontSize="16" />
+                            <TextBlock Text="打开 GitHub" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace SteamEyaWinUI.Services;
 
-internal sealed class SteamWorkshopService
+internal sealed partial class SteamWorkshopService
 {
     private const uint AppId = 730;
     private const int ListType = 1;
@@ -134,10 +134,7 @@ internal sealed class SteamWorkshopService
             response.EnsureSuccessStatusCode();
             var html = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            foreach (Match match in Regex.Matches(
-                html,
-                @"filedetails/\?id=(\d+)""[^>]*><div class=""workshopItemPreviewHolder",
-                RegexOptions.CultureInvariant))
+            foreach (Match match in SubscriptionIdRegex().Matches(html))
             {
                 var id = match.Groups[1].Value;
                 if (!ids.Contains(id))
@@ -146,15 +143,12 @@ internal sealed class SteamWorkshopService
                 }
             }
 
-            foreach (Match match in Regex.Matches(
-                html,
-                @"filedetails/\?id=(\d+)""[^>]*><div class=""workshopItemTitle"">([^<]*)<",
-                RegexOptions.CultureInvariant))
+            foreach (Match match in SubscriptionTitleRegex().Matches(html))
             {
                 titles[match.Groups[1].Value] = WebUtility.HtmlDecode(match.Groups[2].Value.Trim());
             }
 
-            var totalMatch = Regex.Match(html, @"of ([\d,]+) entries", RegexOptions.CultureInvariant);
+            var totalMatch = TotalEntriesRegex().Match(html);
             var total = totalMatch.Success
                 ? int.Parse(totalMatch.Groups[1].Value.Replace(",", "", StringComparison.Ordinal))
                 : ids.Count;
@@ -175,4 +169,13 @@ internal sealed class SteamWorkshopService
     {
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(byteCount)).ToLowerInvariant();
     }
+
+    [GeneratedRegex(@"filedetails/\?id=(\d+)""[^>]*><div class=""workshopItemPreviewHolder", RegexOptions.CultureInvariant)]
+    private static partial Regex SubscriptionIdRegex();
+
+    [GeneratedRegex(@"filedetails/\?id=(\d+)""[^>]*><div class=""workshopItemTitle"">([^<]*)<", RegexOptions.CultureInvariant)]
+    private static partial Regex SubscriptionTitleRegex();
+
+    [GeneratedRegex(@"of ([\d,]+) entries", RegexOptions.CultureInvariant)]
+    private static partial Regex TotalEntriesRegex();
 }

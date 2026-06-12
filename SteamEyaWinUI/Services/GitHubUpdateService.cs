@@ -12,11 +12,9 @@ internal sealed class GitHubUpdateService
 
     private const string LatestReleaseApiUrl = "https://api.github.com/repos/tuntun1337/opensteameya/releases/latest";
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private static readonly HttpClient HttpClient = CreateHttpClient();
 
-    public static string CurrentVersion => GetCurrentVersion();
+    public static string CurrentVersion { get; } = GetCurrentVersion();
 
     public async Task<GitHubUpdateInfo> CheckLatestAsync(CancellationToken cancellationToken = default)
     {
@@ -24,9 +22,9 @@ internal sealed class GitHubUpdateService
         releaseResponse.EnsureSuccessStatusCode();
 
         await using var releaseStream = await releaseResponse.Content.ReadAsStreamAsync(cancellationToken);
-        var release = await JsonSerializer.DeserializeAsync<GitHubReleaseDto>(
+        var release = await JsonSerializer.DeserializeAsync(
             releaseStream,
-            JsonOptions,
+            GitHubUpdateJsonContext.Default.GitHubReleaseDto,
             cancellationToken)
             ?? throw new InvalidOperationException("GitHub Release 响应为空。");
 
@@ -40,9 +38,9 @@ internal sealed class GitHubUpdateService
             metadataResponse.EnsureSuccessStatusCode();
 
             await using var metadataStream = await metadataResponse.Content.ReadAsStreamAsync(cancellationToken);
-            metadata = await JsonSerializer.DeserializeAsync<GitHubReleaseMetadataDto>(
+            metadata = await JsonSerializer.DeserializeAsync(
                 metadataStream,
-                JsonOptions,
+                GitHubUpdateJsonContext.Default.GitHubReleaseMetadataDto,
                 cancellationToken);
         }
 
@@ -163,17 +161,17 @@ internal sealed class GitHubUpdateService
         return string.IsNullOrWhiteSpace(normalized) ? "0.0.0" : normalized;
     }
 
-    private sealed record GitHubReleaseDto(
+    internal sealed record GitHubReleaseDto(
         [property: JsonPropertyName("tag_name")] string TagName,
         [property: JsonPropertyName("html_url")] string HtmlUrl,
         [property: JsonPropertyName("assets")] IReadOnlyList<GitHubReleaseAssetDto> Assets);
 
-    private sealed record GitHubReleaseAssetDto(
+    internal sealed record GitHubReleaseAssetDto(
         [property: JsonPropertyName("name")] string Name,
         [property: JsonPropertyName("browser_download_url")] string BrowserDownloadUrl,
         [property: JsonPropertyName("size")] long Size);
 
-    private sealed record GitHubReleaseMetadataDto(
+    internal sealed record GitHubReleaseMetadataDto(
         string? Version,
         string? Tag,
         string? ArtifactName,
@@ -181,3 +179,10 @@ internal sealed class GitHubUpdateService
         string? ArtifactSha256,
         IReadOnlyList<string>? Changelog);
 }
+
+// JsonSerializerDefaults.Web 保持旧版反射序列化语义：camelCase + 大小写不敏感，
+// latest.json 的字段（version/tag/artifactName...）依赖该命名策略。
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(GitHubUpdateService.GitHubReleaseDto))]
+[JsonSerializable(typeof(GitHubUpdateService.GitHubReleaseMetadataDto))]
+internal sealed partial class GitHubUpdateJsonContext : JsonSerializerContext;
