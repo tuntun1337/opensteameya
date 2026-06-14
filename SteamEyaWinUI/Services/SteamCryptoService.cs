@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -28,7 +29,7 @@ internal sealed class SteamCryptoService
                     flags,
                     out var protectedBlob))
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "EYA 令牌加密失败。");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), Loc.T("Steam_Error_TokenEncryptFailed"));
             }
 
             try

@@ -1,15 +1,19 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 using SteamEyaWinUI.Services;
 
 namespace SteamEyaWinUI.Pages;
 
-public sealed partial class CachedAccountsPage : Page
+public sealed partial class CachedAccountsPage : Page, INotifyPropertyChanged
 {
+    private readonly DispatcherQueue _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
     private readonly ObservableCollection<CachedSteamLoginAccount> _viewItems = [];
     private IReadOnlyList<CachedSteamLoginAccount> _sourceItems = [];
     private bool _isDialogFlowActive;
@@ -25,7 +29,23 @@ public sealed partial class CachedAccountsPage : Page
         InitializeComponent();
         CachedAccountList.ItemsSource = _viewItems;
         AppState.BusyChanged += _ => UpdateControlsEnabled();
+        Loc.LanguageChanged += OnLanguageChanged;
         Reload();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>XAML 绑定入口：{x:Bind Strings.Get('Key'), Mode=OneWay}。</summary>
+    internal LocalizedStrings Strings => Loc.Strings;
+
+    private void OnLanguageChanged()
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            // 静态 x:Bind 文本随 Strings 重算；命令式文本（概要/空状态/批量栏/详情面板）重跑对应方法即可换语言。
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Strings)));
+            RebuildView(GetSelectedKey());
+        });
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -85,13 +105,13 @@ public sealed partial class CachedAccountsPage : Page
 
         var hasAny = source.Count > 0;
         CachedEmptyPanel.Visibility = _viewItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        CachedEmptyText.Text = hasAny ? "没有匹配的缓存账号" : "暂无缓存账号";
+        CachedEmptyText.Text = hasAny ? Loc.T("Cached_Empty_NoMatch") : Loc.T("Cached_Empty_None");
         CachedEmptyHintText.Text = hasAny
-            ? "换个关键词试试，或清空搜索框。"
-            : "先正常登录 Steam，再使用 EYA 登录，原 Steam 账号会自动缓存。";
+            ? Loc.T("Cached_Empty_NoMatch_Hint")
+            : Loc.T("Cached_Empty_None_Hint");
         CachedSummaryText.Text = hasAny
-            ? $"共 {source.Count} 个缓存账号，使用 EYA 登录前检测到的原 Steam 登录账号会记录在这里。"
-            : "使用 EYA 登录前检测到的原 Steam 登录账号会记录在这里。";
+            ? Loc.Tf("Cached_Summary_Count_Format", source.Count)
+            : Loc.T("Cached_Summary_Empty");
 
         UpdateBatchBar();
         UpdateDetail();
@@ -122,18 +142,18 @@ public sealed partial class CachedAccountsPage : Page
     private async void RefreshCachedButton_Click(object sender, RoutedEventArgs e)
     {
         AppState.SetBusy(true);
-        AppState.ShowStatus("正在刷新缓存账号资料...", InfoBarSeverity.Informational);
+        AppState.ShowStatus(Loc.T("Cached_Refresh_Progress"), InfoBarSeverity.Informational);
 
         try
         {
             var refreshed = await AppState.LoginService.RefreshCachedLoginProfilesAsync(_sourceItems);
             Reload(GetSelectedKey());
-            AppState.ShowStatus($"缓存账号已刷新，已同步 {refreshed} 个头像/资料。", InfoBarSeverity.Success);
+            AppState.ShowStatus(Loc.Tf("Cached_Refresh_Success_Format", refreshed), InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
             Reload(GetSelectedKey());
-            AppState.ShowStatus($"刷新缓存账号资料失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("Cached_Refresh_Fail_Format", ex.Message), InfoBarSeverity.Error);
         }
         finally
         {
@@ -151,12 +171,12 @@ public sealed partial class CachedAccountsPage : Page
     {
         if (CachedAccountList.SelectedItem is not CachedSteamLoginAccount account)
         {
-            AppState.ShowStatus("请先选择要恢复的缓存账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("Cached_Restore_NoSelection"), InfoBarSeverity.Error);
             return;
         }
 
         AppState.SetBusy(true);
-        AppState.ShowStatus($"正在恢复缓存账号 {account.AccountTitle}...", InfoBarSeverity.Informational);
+        AppState.ShowStatus(Loc.Tf("Cached_Restore_Progress_Format", account.AccountTitle), InfoBarSeverity.Informational);
 
         var progress = new Progress<string>(message =>
             AppState.ShowStatus(message, InfoBarSeverity.Informational));
@@ -166,13 +186,13 @@ public sealed partial class CachedAccountsPage : Page
             var restored = await Task.Run(() => AppState.LoginService.RestoreCachedLogin(account, progress));
             Reload(restored.CacheKey);
             AppState.ShowStatus(
-                $"已请求恢复缓存账号：{restored.AccountName}（SteamID: {restored.SteamId}）。",
+                Loc.Tf("Cached_Restore_Success_Format", restored.AccountName, restored.SteamId),
                 InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
             AppLog.Error("恢复缓存账号失败。", ex);
-            AppState.ShowStatus($"{ex.Message}（诊断日志：{AppLog.LogFilePath}）", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("Cached_Restore_Fail_Format", ex.Message, AppLog.LogFilePath), InfoBarSeverity.Error);
         }
         finally
         {
@@ -189,16 +209,16 @@ public sealed partial class CachedAccountsPage : Page
 
         if (_sourceItems.Count == 0)
         {
-            AppState.ShowStatus("没有可清空的缓存账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("Cached_Clear_None"), InfoBarSeverity.Error);
             return;
         }
 
         var dialog = new ContentDialog
         {
-            Title = "清空缓存账号",
-            Content = $"将清空全部 {_sourceItems.Count} 个缓存账号并删除头像缓存，此操作不可恢复。",
-            PrimaryButtonText = "清空",
-            CloseButtonText = "取消",
+            Title = Loc.T("Cached_Clear_Dialog_Title"),
+            Content = Loc.Tf("Cached_Clear_Dialog_Content_Format", _sourceItems.Count),
+            PrimaryButtonText = Loc.T("Common_Clear"),
+            CloseButtonText = Loc.T("Common_Cancel"),
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot
         };
@@ -214,11 +234,11 @@ public sealed partial class CachedAccountsPage : Page
             _checkedKeys.Clear();
             var cleared = AppState.LoginService.ClearCachedLoginAccounts();
             Reload();
-            AppState.ShowStatus($"已清空 {cleared} 个缓存账号。", InfoBarSeverity.Success);
+            AppState.ShowStatus(Loc.Tf("Cached_Clear_Success_Format", cleared), InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            AppState.ShowStatus($"清空失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("Cached_Clear_Fail_Format", ex.Message), InfoBarSeverity.Error);
         }
         finally
         {
@@ -270,6 +290,14 @@ public sealed partial class CachedAccountsPage : Page
         UpdateControlsEnabled();
     }
 
+    private async void CachedCardDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardItem(sender) is { } account)
+        {
+            await DeleteAccountsWithConfirmAsync(new[] { account });
+        }
+    }
+
     // ---------- 底部批量操作栏（勾选任意卡片后浮现，操作针对全部已勾选账号） ----------
 
     // 只作用于当前可见（已过滤）列表：避免搜索过滤下对看不见的勾选项执行批量删除。
@@ -281,7 +309,7 @@ public sealed partial class CachedAccountsPage : Page
     {
         var count = GetCheckedAccounts().Count;
         BatchActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        BatchSelectionText.Text = $"已选 {count} 项";
+        BatchSelectionText.Text = Loc.Tf("Common_Selected_Format", count);
     }
 
     private void ClearCheckedSelection()
@@ -315,21 +343,21 @@ public sealed partial class CachedAccountsPage : Page
 
         if (accounts.Count == 0)
         {
-            AppState.ShowStatus("请先勾选要删除的缓存账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("Cached_Delete_NoSelection"), InfoBarSeverity.Error);
             return;
         }
 
         var nameText = string.Join("、", accounts.Take(5).Select(account => account.AccountTitle));
         var summary = accounts.Count > 5
-            ? $"将删除 {nameText} 等 {accounts.Count} 个缓存账号，仅移除本地缓存记录与头像。"
-            : $"将删除 {nameText}（共 {accounts.Count} 个），仅移除本地缓存记录与头像。";
+            ? Loc.Tf("Cached_Delete_Dialog_Many_Format", nameText, accounts.Count)
+            : Loc.Tf("Cached_Delete_Dialog_Few_Format", nameText, accounts.Count);
 
         var dialog = new ContentDialog
         {
-            Title = "删除缓存账号",
+            Title = Loc.T("Cached_Delete_Dialog_Title"),
             Content = summary,
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
+            PrimaryButtonText = Loc.T("Common_Delete"),
+            CloseButtonText = Loc.T("Common_Cancel"),
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot
         };
@@ -350,11 +378,11 @@ public sealed partial class CachedAccountsPage : Page
 
             var removed = AppState.LoginService.DeleteCachedLoginAccounts(accounts);
             Reload();
-            AppState.ShowStatus($"已删除 {removed} 个缓存账号。", InfoBarSeverity.Success);
+            AppState.ShowStatus(Loc.Tf("Cached_Delete_Success_Format", removed), InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            AppState.ShowStatus($"删除失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("Cached_Delete_Fail_Format", ex.Message), InfoBarSeverity.Error);
         }
         finally
         {
@@ -379,11 +407,11 @@ public sealed partial class CachedAccountsPage : Page
         if (CachedAccountList.SelectedItem is not CachedSteamLoginAccount account)
         {
             CachedDetailAvatar.ProfilePicture = null;
-            CachedDetailAvatar.DisplayName = "未选择";
-            CachedDetailAccountNameText.Text = "未选择账号";
-            CachedDetailPersonaText.Text = "Steam 资料未同步";
-            CachedDetailSteamIdText.Text = "Steam64 未记录";
-            CachedDetailTimeText.Text = "暂无缓存时间";
+            CachedDetailAvatar.DisplayName = Loc.T("Cached_Detail_Avatar_None");
+            CachedDetailAccountNameText.Text = Loc.T("Cached_Detail_NoSelection");
+            CachedDetailPersonaText.Text = Loc.T("Cached_Detail_PersonaUnsynced");
+            CachedDetailSteamIdText.Text = Loc.T("Cached_Detail_SteamIdMissing");
+            CachedDetailTimeText.Text = Loc.T("Cached_Detail_TimeNone");
             return;
         }
 
@@ -392,7 +420,7 @@ public sealed partial class CachedAccountsPage : Page
         CachedDetailAccountNameText.Text = account.AccountTitle;
         CachedDetailPersonaText.Text = account.PersonaDisplayName;
         CachedDetailSteamIdText.Text = account.SteamIdDisplay;
-        CachedDetailTimeText.Text = $"缓存时间：{account.CachedAtText}";
+        CachedDetailTimeText.Text = Loc.Tf("Cached_Detail_Time_Format", account.CachedAtText);
     }
 
     private void UpdateControlsEnabled()

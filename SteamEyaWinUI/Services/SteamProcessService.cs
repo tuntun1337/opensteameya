@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -14,7 +15,7 @@ internal sealed class SteamProcessService
         }
 
         AppLog.Info("检测到 Steam 正在运行，尝试关闭...");
-        progress?.Report("Steam 正在运行，正在关闭...");
+        progress?.Report(Loc.T("Steam_Progress_StoppingSteam"));
 
         var steamExe = Path.Combine(paths.InstallPath, "steam.exe");
         if (File.Exists(steamExe))
@@ -51,7 +52,7 @@ internal sealed class SteamProcessService
         }
 
         AppLog.Warn("Steam 未在 10 秒内退出，强制结束相关进程。");
-        progress?.Report("Steam 未及时退出，正在结束相关进程...");
+        progress?.Report(Loc.T("Steam_Progress_KillingSteam"));
         KillProcesses("steam");
         KillProcesses("steamwebhelper");
 
@@ -68,7 +69,7 @@ internal sealed class SteamProcessService
 
         // 不中止会导致旧 Steam 退出时回写 loginusers.vdf 覆盖新配置，表现为"上号成功但没切账号"。
         AppLog.Error("强制结束后 Steam 进程仍在运行，中止上号流程。");
-        throw new InvalidOperationException("无法结束正在运行的 Steam（可能以管理员权限运行）。请手动退出 Steam 后重试。");
+        throw new InvalidOperationException(Loc.T("Steam_Error_CannotStopSteam"));
     }
 
     public void LaunchSteamWithLogin(SteamPaths paths, string accountName)
@@ -77,7 +78,7 @@ internal sealed class SteamProcessService
         if (!File.Exists(steamExe))
         {
             AppLog.Error($"启动失败：找不到 steam.exe：\"{steamExe}\"");
-            throw new InvalidOperationException($"没有找到 Steam 可执行文件：{steamExe}");
+            throw new InvalidOperationException(Loc.Tf("Steam_Error_SteamExeNotFound_Format", steamExe));
         }
 
         var startInfo = new ProcessStartInfo
@@ -97,7 +98,7 @@ internal sealed class SteamProcessService
             if (process is null)
             {
                 AppLog.Error("Process.Start 返回 null，系统未创建 Steam 进程。");
-                throw new InvalidOperationException("Steam 启动失败（系统未创建进程）。");
+                throw new InvalidOperationException(Loc.T("Steam_Error_LaunchNoProcess"));
             }
 
             AppLog.Info($"已启动 Steam 进程，PID={process.Id}。");
@@ -106,7 +107,7 @@ internal sealed class SteamProcessService
         {
             // Win32Exception（被杀软拦截、文件不可执行、权限不足等）原始信息对诊断很关键。
             AppLog.Error($"启动 Steam 抛出异常：\"{steamExe}\"", ex);
-            throw new InvalidOperationException($"启动 Steam 失败：{ex.Message}", ex);
+            throw new InvalidOperationException(Loc.Tf("Steam_Error_LaunchFailed_Format", ex.Message), ex);
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -6,7 +7,6 @@ namespace SteamEyaWinUI.Services;
 internal sealed class CsLoadoutService
 {
     private static readonly TimeSpan EquipSoWaitTimeout = TimeSpan.FromSeconds(8);
-    private static readonly TimeSpan LoadoutRefreshTimeout = TimeSpan.FromSeconds(8);
     private static readonly SemaphoreSlim EquipGate = new(1, 1);
 
     private static readonly HttpClient HttpClient = new()
@@ -14,19 +14,21 @@ internal sealed class CsLoadoutService
         Timeout = TimeSpan.FromSeconds(30)
     };
 
-    public async Task<CsLoadoutEquipResult> EquipR8Async(
+    // 一键装配整套预设：把两阵营各槽位的原版武器（itemdef）一次性写入，读回校验。
+    public async Task<CsLoadoutApplyResult> ApplyPresetAsync(
+        CsLoadoutPreset preset,
         string refreshToken,
         string steamId,
         CancellationToken cancellationToken = default)
     {
         if (!await EquipGate.WaitAsync(TimeSpan.Zero, cancellationToken))
         {
-            throw new InvalidOperationException("已有 R8 配装任务正在执行，请等待完成后再试。");
+            throw new InvalidOperationException(Loc.T("Cs_Loadout_Busy"));
         }
 
         try
         {
-            return await EquipR8CoreAsync(refreshToken, steamId, cancellationToken);
+            return await ApplyPresetCoreAsync(preset, refreshToken, steamId, cancellationToken);
         }
         finally
         {
@@ -34,7 +36,8 @@ internal sealed class CsLoadoutService
         }
     }
 
-    private async Task<CsLoadoutEquipResult> EquipR8CoreAsync(
+    private async Task<CsLoadoutApplyResult> ApplyPresetCoreAsync(
+        CsLoadoutPreset preset,
         string refreshToken,
         string steamId,
         CancellationToken cancellationToken)
@@ -43,10 +46,25 @@ internal sealed class CsLoadoutService
         {
             if (!ulong.TryParse(steamId, CultureInfo.InvariantCulture, out var steamId64))
             {
-                throw new InvalidOperationException("Steam64 格式不正确，无法修改配装。");
+                throw new InvalidOperationException(Loc.T("Cs_Loadout_BadSteam64"));
             }
 
             var accountId = CsGcSession.GetAccountId(steamId64);
+
+            var requested = new List<(uint Team, uint Slot, uint Def)>();
+            foreach (var (slot, def) in preset.T)
+            {
+                requested.Add((CsLoadoutConstants.TeamTerrorist, slot, def));
+            }
+            foreach (var (slot, def) in preset.Ct)
+            {
+                requested.Add((CsLoadoutConstants.TeamCounterTerrorist, slot, def));
+            }
+
+            if (requested.Count == 0)
+            {
+                return new CsLoadoutApplyResult(0, 0, []);
+            }
 
             await using var cmClient = new SteamCmClient(HttpClient);
             await cmClient.ConnectAndLogOnAsync(refreshToken, steamId, cancellationToken);
@@ -56,32 +74,32 @@ internal sealed class CsLoadoutService
                 await cmClient.SetGamesPlayedAsync([CsGcSession.Cs2AppId], cancellationToken);
                 var welcomePayload = await CsGcSession.ConnectAsync(cmClient, cancellationToken);
 
-                var loadoutMap = ReadLoadoutFromWelcome(welcomePayload, accountId);
-                if (loadoutMap.Count == 0)
+                // 读当前配装（welcome 内嵌 SO 缓存，已放宽到全槽位），算出与目标的差异。
+                var current = new Dictionary<(uint Team, uint Slot), uint>();
+                foreach (var entry in CsSoCacheParser.ParseLoadoutFromWelcome(welcomePayload, accountId))
                 {
-                    var refreshed = await RefreshLoadoutAsync(
-                        cmClient,
-                        welcomePayload,
-                        steamId64,
-                        accountId,
-                        cancellationToken);
-                    CsSoCacheParser.MergeEntries(loadoutMap, refreshed);
+                    current[(entry.ClassId, entry.SlotId)] = entry.ItemDefinition;
                 }
 
-                var entries = loadoutMap.Values.ToList();
-                var terroristPlan = CsLoadoutPlanner.PlanR8Slot(CsLoadoutConstants.TeamTerrorist, entries);
-                var counterTerroristPlan = CsLoadoutPlanner.PlanR8Slot(
-                    CsLoadoutConstants.TeamCounterTerrorist,
-                    entries);
-
-                var slotsToEquip = BuildSlotsToEquip(terroristPlan, counterTerroristPlan);
-                if (slotsToEquip.Count == 0)
+                // 已是目标状态的槽位直接计为已确认（GC 不会回写未改动的槽，发了反而误报失败）；只发差异。
+                var toSend = new List<(uint Team, uint Slot, uint Def)>();
+                var alreadyOk = 0;
+                foreach (var item in requested)
                 {
-                    var noChangeResult = new CsLoadoutEquipResult(
-                        terroristPlan.Status,
-                        counterTerroristPlan.Status);
-                    LogOutcome(noChangeResult);
-                    return noChangeResult;
+                    if (current.TryGetValue((item.Team, item.Slot), out var cur) && cur == item.Def)
+                    {
+                        alreadyOk++;
+                    }
+                    else
+                    {
+                        toSend.Add(item);
+                    }
+                }
+
+                if (toSend.Count == 0)
+                {
+                    AppLog.Info($"一键配装：{requested.Count} 个位置已是目标状态，无需改动。");
+                    return new CsLoadoutApplyResult(requested.Count, requested.Count, []);
                 }
 
                 var tappedMessages = new List<SteamCmClient.SteamGcClientMessage>();
@@ -99,42 +117,55 @@ internal sealed class CsLoadoutService
                 {
                     CsSoCacheParser.TryGetSoCacheVersionFromWelcome(welcomePayload, out var soCacheVersion);
                     var changeNum = BuildChangeNum(soCacheVersion);
-                    var defaultItemId = CsLoadoutConstants.BuildDefaultBaseItemId(
-                        CsLoadoutConstants.ItemDefinitionRevolver);
+
+                    var slotEntries = toSend
+                        .Select(r => (r.Team, r.Slot, CsLoadoutConstants.BuildDefaultBaseItemId(r.Def)))
+                        .ToList();
 
                     await cmClient.SendGcProtobufMessageAsync(
                         CsGcSession.Cs2AppId,
                         CsLoadoutConstants.AdjustEquipSlotsManual,
-                        EncodeAdjustEquipSlots(slotsToEquip, defaultItemId, changeNum),
+                        EncodeAdjustEquipSlotsMulti(slotEntries, changeNum),
                         cancellationToken);
 
-                    verifiedEntries = await WaitForEquipSoUpdateAsync(
+                    await WaitForEquipSoUpdateAsync(
                         cmClient,
                         tappedMessages,
                         tappedMessagesLock,
                         accountId,
                         cancellationToken);
+
+                    // 整套配装可能分多条 SO 更新返回，首条到达后再宽限一会，收齐尾随更新再合并。
+                    await Task.Delay(TimeSpan.FromMilliseconds(1200), cancellationToken);
+                    verifiedEntries = MergeLoadoutFromTappedMessages(tappedMessages, tappedMessagesLock, accountId);
                 }
                 finally
                 {
                     cmClient.SetGcMessageTap(null);
                 }
 
-                var terroristStatus = ResolveTeamStatus(
-                    terroristPlan,
-                    CsLoadoutConstants.TeamTerrorist,
-                    verifiedEntries);
-                var counterTerroristStatus = ResolveTeamStatus(
-                    counterTerroristPlan,
-                    CsLoadoutConstants.TeamCounterTerrorist,
-                    verifiedEntries);
+                var verifiedSet = verifiedEntries
+                    .Select(e => (e.ClassId, e.SlotId, e.ItemDefinition))
+                    .ToHashSet();
 
-                var result = new CsLoadoutEquipResult(
-                    terroristStatus,
-                    counterTerroristStatus,
-                    BuildFailureMessage(terroristStatus, counterTerroristStatus));
+                var failures = new List<string>();
+                var confirmedChanges = 0;
+                foreach (var (team, slot, def) in toSend)
+                {
+                    if (verifiedSet.Contains((team, slot, def)))
+                    {
+                        confirmedChanges++;
+                    }
+                    else
+                    {
+                        var teamName = team == CsLoadoutConstants.TeamTerrorist ? "T" : "CT";
+                        var name = CsWeaponCatalog.ByDef(def)?.LocalizedName ?? def.ToString(CultureInfo.InvariantCulture);
+                        failures.Add($"{teamName} #{slot} {name}");
+                    }
+                }
 
-                LogOutcome(result);
+                var result = new CsLoadoutApplyResult(requested.Count, alreadyOk + confirmedChanges, failures);
+                AppLog.Info($"一键配装：请求 {result.Requested}，确认 {result.Confirmed}，失败 {failures.Count}。");
                 return result;
             }
             finally
@@ -145,7 +176,7 @@ internal sealed class CsLoadoutService
                 }
                 catch
                 {
-
+                    // best-effort
                 }
             }
         }
@@ -154,113 +185,16 @@ internal sealed class CsLoadoutService
             if (IsSteamSessionConflict(ex))
             {
                 var conflict = new InvalidOperationException(
-                    ex.Message.Contains("CM 连接已被顶替", StringComparison.Ordinal)
+                    (ex.Data["CmConflict"] as string) == "SessionReplaced"
                         ? ex.Message
-                        : "Steam CM 连接被断开：请尝试先完全退出 CS2 和 Steam，再在 SteamEYA 中执行 R8 配装。",
+                        : Loc.T("Cs_Loadout_CmDisconnected"),
                     ex);
-                AppLog.Error($"R8 配装失败：{conflict.Message}");
+                AppLog.Error($"一键配装失败：{conflict.Message}");
                 throw conflict;
             }
 
-            AppLog.Error($"R8 配装失败：{ex.Message}");
+            AppLog.Error($"一键配装失败：{ex.Message}");
             throw;
-        }
-    }
-
-    private static void LogOutcome(CsLoadoutEquipResult result)
-    {
-        if (result.IsSuccess)
-        {
-            AppLog.Info("R8 配装成功。");
-            return;
-        }
-
-        AppLog.Error($"R8 配装失败：{result.ErrorMessage ?? result.FormatSummary()}");
-    }
-
-    private static Dictionary<(uint ClassId, uint SlotId), CsLoadoutEntry> ReadLoadoutFromWelcome(
-        byte[] welcomePayload,
-        uint accountId)
-    {
-        var loadoutMap = new Dictionary<(uint ClassId, uint SlotId), CsLoadoutEntry>();
-        CsSoCacheParser.MergeEntries(
-            loadoutMap,
-            CsSoCacheParser.ParseLoadoutFromWelcome(welcomePayload, accountId));
-        return loadoutMap;
-    }
-
-    private static List<(uint ClassId, uint SlotId)> BuildSlotsToEquip(
-        CsR8EquipPlan terroristPlan,
-        CsR8EquipPlan counterTerroristPlan)
-    {
-        var slots = new List<(uint ClassId, uint SlotId)>();
-
-        if (terroristPlan.Status == CsLoadoutTeamStatus.Equipped && terroristPlan.SlotId.HasValue)
-        {
-            slots.Add((CsLoadoutConstants.TeamTerrorist, terroristPlan.SlotId.Value));
-        }
-
-        if (counterTerroristPlan.Status == CsLoadoutTeamStatus.Equipped &&
-            counterTerroristPlan.SlotId.HasValue)
-        {
-            slots.Add((CsLoadoutConstants.TeamCounterTerrorist, counterTerroristPlan.SlotId.Value));
-        }
-
-        return slots;
-    }
-
-    private static CsLoadoutTeamStatus ResolveTeamStatus(
-        CsR8EquipPlan plan,
-        uint teamClassId,
-        IReadOnlyList<CsLoadoutEntry> verifiedEntries)
-    {
-        if (plan.Status != CsLoadoutTeamStatus.Equipped)
-        {
-            return plan.Status;
-        }
-
-        return CsLoadoutPlanner.HasR8Equipped(teamClassId, verifiedEntries)
-            ? CsLoadoutTeamStatus.Equipped
-            : CsLoadoutTeamStatus.Failed;
-    }
-
-    private static async Task<List<CsLoadoutEntry>> RefreshLoadoutAsync(
-        SteamCmClient cmClient,
-        byte[] welcomePayload,
-        ulong steamId64,
-        uint accountId,
-        CancellationToken cancellationToken)
-    {
-        if (!CsSoCacheParser.TryGetOwnerSoidFromWelcome(welcomePayload, out var ownerType, out var ownerId))
-        {
-            ownerType = CsLoadoutConstants.SoOwnerTypeIndividual;
-            ownerId = steamId64;
-        }
-
-        try
-        {
-            var refreshTask = cmClient.WaitForGcMessageAsync(
-                CsGcSession.Cs2AppId,
-                CsLoadoutConstants.SoCacheSubscribed,
-                LoadoutRefreshTimeout,
-                cancellationToken,
-                cacheUnmatched: true);
-
-            await cmClient.SendGcProtobufMessageAsync(
-                CsGcSession.Cs2AppId,
-                CsLoadoutConstants.SoCacheSubscriptionRefresh,
-                EncodeSoCacheSubscriptionRefresh(ownerType, ownerId),
-                cancellationToken);
-
-            var message = await refreshTask;
-            return CsSoCacheParser.ParseLoadoutFromGcMessage(
-                message.MessageType,
-                message.Payload,
-                accountId);
-        }
-        catch (TimeoutException)
-        {
-            return [];
         }
     }
 
@@ -353,7 +287,7 @@ internal sealed class CsLoadoutService
             }
         }
 
-        throw new TimeoutException("等待 SO 配装更新超时。");
+        throw new TimeoutException(Loc.T("Cs_Loadout_SoTimeout"));
     }
 
     private static List<CsLoadoutEntry> MergeLoadoutFromTappedMessages(
@@ -383,51 +317,22 @@ internal sealed class CsLoadoutService
         return loadoutMap.Values.ToList();
     }
 
+    // 用 SteamCmClient 打在异常上的语言中立标记判定，不依赖本地化后的 Message 文本。
     private static bool IsSteamSessionConflict(Exception ex) =>
-        ex.Message.Contains("CM 连接已被顶替", StringComparison.Ordinal) ||
-        ex.Message.Contains("Steam 账号已下线", StringComparison.Ordinal);
-
-    private static string? BuildFailureMessage(
-        CsLoadoutTeamStatus terroristStatus,
-        CsLoadoutTeamStatus counterTerroristStatus)
-    {
-        if (terroristStatus is CsLoadoutTeamStatus.Equipped or CsLoadoutTeamStatus.AlreadyEquipped &&
-            counterTerroristStatus is CsLoadoutTeamStatus.Equipped or CsLoadoutTeamStatus.AlreadyEquipped)
-        {
-            return null;
-        }
-
-        if (terroristStatus != CsLoadoutTeamStatus.Failed &&
-            counterTerroristStatus != CsLoadoutTeamStatus.Failed)
-        {
-            return null;
-        }
-
-        return "R8 配装未生效。请确认已完全退出 CS2 和 Steam 后重试。";
-    }
+        ex.Data["CmConflict"] is string;
 
     private static uint BuildChangeNum(ulong soCacheVersion) =>
         soCacheVersion != 0
             ? (uint)((soCacheVersion + 1) & 0xFFFFFFFF)
             : 1;
 
-    private static byte[] EncodeSoCacheSubscriptionRefresh(uint ownerType, ulong ownerId) =>
-        SteamProtoWriter.Build(writer =>
-        {
-            writer.WriteBytes(2, SteamProtoWriter.Build(ownerWriter =>
-            {
-                ownerWriter.WriteUInt32(1, ownerType);
-                ownerWriter.WriteUInt64(2, ownerId);
-            }));
-        });
-
-    private static byte[] EncodeAdjustEquipSlots(
-        IReadOnlyList<(uint ClassId, uint SlotId)> slots,
-        ulong itemId,
+    // 每槽各自带 itemId 的批量装配消息（整套配装一次发出）。
+    private static byte[] EncodeAdjustEquipSlotsMulti(
+        IReadOnlyList<(uint ClassId, uint SlotId, ulong ItemId)> slots,
         uint changeNum) =>
         SteamProtoWriter.Build(writer =>
         {
-            foreach (var (classId, slotId) in slots)
+            foreach (var (classId, slotId, itemId) in slots)
             {
                 writer.WriteBytes(1, SteamProtoWriter.Build(slotWriter =>
                 {

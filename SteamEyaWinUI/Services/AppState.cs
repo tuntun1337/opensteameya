@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Controls;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -18,6 +19,7 @@ internal static class AppState
     public static CsPremierScoreService PremierScoreService { get; } = new();
     public static CsLoadoutService LoadoutService { get; } = new();
     public static GitHubUpdateService UpdateService { get; } = new();
+    public static SettingsService SettingsService { get; } = new();
 
     /// <summary>由 MainWindow 注入，向全局状态栏输出消息。</summary>
     public static Action<string, InfoBarSeverity>? StatusReporter { get; set; }
@@ -96,7 +98,7 @@ internal static class AppState
         catch (Exception ex)
         {
             HistoryAccounts = [];
-            ShowStatus($"历史账号读取失败：{ex.Message}", InfoBarSeverity.Warning);
+            ShowStatus(Loc.Tf("AppState_HistoryLoadFailed_Format", ex.Message), InfoBarSeverity.Warning);
         }
 
         if (!string.IsNullOrWhiteSpace(selectSteamId))
@@ -139,7 +141,7 @@ internal static class AppState
 
         if (!isAutomatic)
         {
-            ShowStatus("正在检查更新...", InfoBarSeverity.Informational);
+            ShowStatus(Loc.T("AppState_Update_Checking"), InfoBarSeverity.Informational);
         }
 
         try
@@ -151,11 +153,11 @@ internal static class AppState
 
             if (update.IsUpdateAvailable)
             {
-                ShowStatus($"发现新版本 {update.LatestTag}。", InfoBarSeverity.Warning);
+                ShowStatus(Loc.Tf("AppState_Update_Available_Format", update.LatestTag), InfoBarSeverity.Warning);
             }
             else if (!isAutomatic)
             {
-                ShowStatus($"已经是最新版本：{update.LatestTag}。", InfoBarSeverity.Success);
+                ShowStatus(Loc.Tf("AppState_Update_UpToDate_Format", update.LatestTag), InfoBarSeverity.Success);
             }
         }
         catch (Exception ex)
@@ -165,7 +167,7 @@ internal static class AppState
 
             if (!isAutomatic)
             {
-                ShowStatus($"检查更新失败：{ex.Message}", InfoBarSeverity.Error);
+                ShowStatus(Loc.Tf("AppState_Update_CheckFailed_Format", ex.Message), InfoBarSeverity.Error);
             }
         }
         finally
@@ -179,13 +181,13 @@ internal static class AppState
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
-            ShowStatus("链接格式不正确。", InfoBarSeverity.Error);
+            ShowStatus(Loc.T("AppState_Url_Invalid"), InfoBarSeverity.Error);
             return;
         }
 
         var opened = await Windows.System.Launcher.LaunchUriAsync(uri);
         ShowStatus(
-            opened ? "已打开浏览器。" : "无法打开浏览器。",
+            opened ? Loc.T("AppState_Url_Opened") : Loc.T("AppState_Url_OpenFailed"),
             opened ? InfoBarSeverity.Success : InfoBarSeverity.Error);
     }
 }

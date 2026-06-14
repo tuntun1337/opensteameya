@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -32,28 +33,28 @@ internal sealed partial class SteamWorkshopService
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        progress?.Report("正在校验 EYA 令牌...");
+        progress?.Report(Loc.T("Workshop_Progress_ValidatingToken"));
         var token = _jwtTokenService.Validate(eyaToken);
 
         await using var cmClient = new SteamCmClient(HttpClient);
 
-        progress?.Report("正在连接 Steam...");
+        progress?.Report(Loc.T("Workshop_Progress_Connecting"));
         await cmClient.ConnectAndLogOnAsync(eyaToken, token.SteamId, cancellationToken);
 
-        progress?.Report($"已登录 Steam (SteamID: {token.SteamId})");
-        progress?.Report("正在获取 Web 会话...");
+        progress?.Report(Loc.Tf("Workshop_Progress_LoggedIn_Format", token.SteamId));
+        progress?.Report(Loc.T("Workshop_Progress_GettingWebSession"));
         var cookieHeader = await GetWebSessionAsync(cmClient, eyaToken, token.SteamId, cancellationToken);
 
-        progress?.Report("正在获取已订阅的创意工坊项目列表...");
+        progress?.Report(Loc.T("Workshop_Progress_GettingSubscriptions"));
         var (ids, titles) = await EnumerateSubscriptionsAsync(token.SteamId, cookieHeader, cancellationToken);
 
         if (ids.Count == 0)
         {
-            progress?.Report("没有找到 AppID 730 的创意工坊订阅。");
+            progress?.Report(Loc.T("Workshop_Progress_NoSubscriptions"));
             return 0;
         }
 
-        progress?.Report($"找到 {ids.Count} 个订阅，正在取消...");
+        progress?.Report(Loc.Tf("Workshop_Progress_FoundSubscriptions_Format", ids.Count));
 
         var unsubscribed = 0;
         for (var i = 0; i < ids.Count; i++)
@@ -78,11 +79,11 @@ internal sealed partial class SteamWorkshopService
             if (gone)
             {
                 unsubscribed++;
-                progress?.Report($"[{i + 1}/{ids.Count}] {id} {title} 已退订");
+                progress?.Report(Loc.Tf("Workshop_Progress_ItemUnsubscribed_Format", i + 1, ids.Count, id, title));
             }
             else
             {
-                progress?.Report($"[{i + 1}/{ids.Count}] {id} {title} 失败 (EResult={result})");
+                progress?.Report(Loc.Tf("Workshop_Progress_ItemFailed_Format", i + 1, ids.Count, id, title, result));
             }
 
             if (i < ids.Count - 1)
@@ -91,7 +92,7 @@ internal sealed partial class SteamWorkshopService
             }
         }
 
-        progress?.Report($"完成：成功 {unsubscribed}，失败 {ids.Count - unsubscribed}。");
+        progress?.Report(Loc.Tf("Workshop_Progress_Done_Format", unsubscribed, ids.Count - unsubscribed));
         return unsubscribed;
     }
 
@@ -201,7 +202,7 @@ internal sealed partial class SteamWorkshopService
 
             if (location is null)
             {
-                throw new InvalidOperationException("Steam 返回了重定向但未给出目标地址，会话可能已失效，请重新登录。");
+                throw new InvalidOperationException(Loc.T("Workshop_Error_RedirectNoLocation"));
             }
 
             // Location 可能是相对地址（如 /id/{vanity}/...），基于当前 Uri 解析为绝对地址。
@@ -209,13 +210,13 @@ internal sealed partial class SteamWorkshopService
 
             if (hop >= MaxRedirects)
             {
-                throw new InvalidOperationException("Steam 重定向次数过多，会话可能已失效，请重新登录。");
+                throw new InvalidOperationException(Loc.T("Workshop_Error_TooManyRedirects"));
             }
 
             if (!IsTrustedSteamCommunityUri(target))
             {
                 // 跳出 steamcommunity.com 通常意味着 access token 不被接受、被导向登录页等。
-                throw new InvalidOperationException("会话已失效或令牌不被接受（被重定向到外部地址），请重新登录。");
+                throw new InvalidOperationException(Loc.T("Workshop_Error_RedirectedExternal"));
             }
 
             current = target;

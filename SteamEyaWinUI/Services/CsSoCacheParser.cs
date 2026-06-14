@@ -2,6 +2,9 @@ using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
 
+// 一条 loadout 装备条目（阵营 class、槽位、itemdef）。SO 缓存解析与一键装配读回共用。
+internal readonly record struct CsLoadoutEntry(uint ClassId, uint SlotId, uint ItemDefinition);
+
 internal static class CsSoCacheParser
 {
     public static List<CsLoadoutEntry> ParseLoadoutFromWelcome(byte[] welcomePayload, uint accountId)
@@ -463,7 +466,9 @@ internal static class CsSoCacheParser
             return false;
         }
 
-        if (slotId is < 2 or > 7)
+        // 接受全部武器 loadout 槽位：1=近战、2–7=手枪、8–13=中级、14–19=步枪、34=Zeus。
+        // （R8 功能的 planner 自身只看副武器槽，放宽这里不影响它，但能让整套配装的读回校验覆盖步枪/微冲。）
+        if (slotId is not (1 or (>= 2 and <= 19) or 34))
         {
             return false;
         }

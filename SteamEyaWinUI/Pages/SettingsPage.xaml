@@ -1,0 +1,112 @@
+<Page
+    x:Class="SteamEyaWinUI.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    NavigationCacheMode="Required">
+
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto"
+        Padding="32,24,32,16">
+        <StackPanel MaxWidth="820" Spacing="14" HorizontalAlignment="Left">
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Text="{x:Bind Strings.Get('Settings_Title'), Mode=OneWay}"
+                    Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock
+                    Text="{x:Bind Strings.Get('Settings_Subtitle'), Mode=OneWay}"
+                    Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+
+            <!-- 语言：用 ComboBox 而非堆叠单选，既紧凑（避免页面出现多余滚动条）又适配可增长的语言列表 -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock
+                            Text="{x:Bind Strings.Get('Settings_Language_Section'), Mode=OneWay}"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            Text="{x:Bind Strings.Get('Settings_Language_Desc'), Mode=OneWay}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <!-- 语言自称名不随界面语言变化；选项在 code-behind 按已加载语言包动态生成 -->
+                    <ComboBox
+                        x:Name="LanguageComboBox"
+                        Grid.Column="1"
+                        MinWidth="180"
+                        VerticalAlignment="Center"
+                        SelectionChanged="LanguageComboBox_SelectionChanged" />
+                </Grid>
+            </Border>
+
+            <!-- 主题 -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock
+                            Text="{x:Bind Strings.Get('Settings_Theme_Section'), Mode=OneWay}"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            Text="{x:Bind Strings.Get('Settings_Theme_Desc'), Mode=OneWay}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox
+                        x:Name="ThemeComboBox"
+                        Grid.Column="1"
+                        MinWidth="180"
+                        VerticalAlignment="Center"
+                        SelectionChanged="ThemeComboBox_SelectionChanged">
+                        <ComboBoxItem Tag="Default" Content="{x:Bind Strings.Get('Settings_Theme_System'), Mode=OneWay}" />
+                        <ComboBoxItem Tag="Light" Content="{x:Bind Strings.Get('Settings_Theme_Light'), Mode=OneWay}" />
+                        <ComboBoxItem Tag="Dark" Content="{x:Bind Strings.Get('Settings_Theme_Dark'), Mode=OneWay}" />
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <!-- 数据 -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Spacing="10">
+                    <TextBlock
+                        Text="{x:Bind Strings.Get('Settings_Data_Section'), Mode=OneWay}"
+                        Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock
+                        Text="{x:Bind Strings.Get('Settings_Data_Desc'), Mode=OneWay}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="DataFolderPathText"
+                            VerticalAlignment="Center"
+                            IsTextSelectionEnabled="True"
+                            TextTrimming="CharacterEllipsis"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Button
+                            x:Name="OpenDataFolderButton"
+                            Grid.Column="1"
+                            Click="OpenDataFolderButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE838;" FontSize="16" />
+                                <TextBlock Text="{x:Bind Strings.Get('Settings_Btn_OpenDataFolder'), Mode=OneWay}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

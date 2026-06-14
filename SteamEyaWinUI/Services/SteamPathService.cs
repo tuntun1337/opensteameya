@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Win32;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -44,7 +45,7 @@ internal sealed class SteamPathService
         if (string.IsNullOrWhiteSpace(installPath))
         {
             AppLog.Error("未找到任何存在的 Steam 安装目录（所有候选均不存在）。");
-            throw new InvalidOperationException("没有找到 Steam 安装目录。");
+            throw new InvalidOperationException(Loc.T("Steam_Error_InstallDirNotFound"));
         }
 
         var usedFallback = !File.Exists(Path.Combine(installPath, "steam.exe"));
@@ -55,7 +56,7 @@ internal sealed class SteamPathService
         if (string.IsNullOrWhiteSpace(localAppData))
         {
             AppLog.Error("无法获取 LocalAppData 目录。");
-            throw new InvalidOperationException("没有找到 LocalAppData 目录。");
+            throw new InvalidOperationException(Loc.T("Steam_Error_LocalAppDataNotFound"));
         }
 
         var paths = new SteamPaths(

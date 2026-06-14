@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 using SteamEyaWinUI.Pages;
 using SteamEyaWinUI.Services;
@@ -34,6 +35,11 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         SetWindowIcon();
         TitleVersionText.Text = $"v{GitHubUpdateService.CurrentVersion}";
+
+        ApplyTheme(ParseTheme(AppState.SettingsService.Load().Theme));
+        RefreshNavText();
+        StatusInfoBar.Message = Loc.T("Common_Ready");
+        Loc.LanguageChanged += RefreshNavText;
 
         AppState.StatusReporter = ShowStatus;
         AppState.BusyChanged += OnBusyChanged;
@@ -76,6 +82,8 @@ public sealed partial class MainWindow : Window
         {
             "history" => typeof(HistoryPage),
             "cachedAccounts" => typeof(CachedAccountsPage),
+            "loadout" => typeof(LoadoutPage),
+            "settings" => typeof(SettingsPage),
             "about" => typeof(AboutPage),
             _ => typeof(LoginPage)
         };
@@ -91,6 +99,33 @@ public sealed partial class MainWindow : Window
     {
         BusyRing.IsActive = isBusy;
         BusyRing.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>把主题套用到内容根（无打包下 Application.RequestedTheme 不可后置，故走根元素 RequestedTheme）。</summary>
+    public void ApplyTheme(ElementTheme theme)
+    {
+        if (Content is FrameworkElement root)
+        {
+            root.RequestedTheme = theme;
+        }
+    }
+
+    private static ElementTheme ParseTheme(string theme) => theme switch
+    {
+        "Light" => ElementTheme.Light,
+        "Dark" => ElementTheme.Dark,
+        _ => ElementTheme.Default
+    };
+
+    /// <summary>本地化导航项文字；语言切换时由 Loc.LanguageChanged 再次调用。</summary>
+    private void RefreshNavText()
+    {
+        LoginNavItem.Content = Loc.T("Nav_Login");
+        HistoryNavItem.Content = Loc.T("Nav_History");
+        CachedAccountsNavItem.Content = Loc.T("Nav_CachedAccounts");
+        LoadoutNavItem.Content = Loc.T("Nav_Loadout");
+        SettingsNavItem.Content = Loc.T("Nav_Settings");
+        AboutNavItem.Content = Loc.T("Nav_About");
     }
 
     private void SetWindowIcon()

@@ -39,6 +39,17 @@
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Logo.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- CS2 武器矢量图标（取自 Juknum/counter-strike-icons，CS2 游戏内 panorama 图标）。 -->
+    <Content Include="Assets\weapons\*.svg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 界面语言包：随发布拷到 Languages\ 供贡献者/用户增改，并内嵌一份作发布漏拷时的保底（见 LanguageCatalog）。
+         显式 LogicalName 既让清单名稳定（SteamEyaWinUI.Languages.<code>.json），也避免 en/zh-Hant 被当作附属语言 culture。 -->
+    <Content Include="Languages\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Languages\*.json">
+      <LogicalName>SteamEyaWinUI.Languages.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

@@ -6,6 +6,7 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -46,15 +47,15 @@ internal sealed class SteamCmException : InvalidOperationException
         return result switch
         {
             (int)SteamEresult.Revoked =>
-                "EYA 令牌已被 Steam 拒绝，可能已被手动撤销。",
+                Loc.T("Cm_Error_TokenRevoked"),
             (int)SteamEresult.Expired =>
-                "EYA 令牌已被 Steam 判定为过期。",
+                Loc.T("Cm_Error_TokenExpired"),
             (int)SteamEresult.InvalidPassword or
             (int)SteamEresult.InvalidParam or
             (int)SteamEresult.AccessDenied or
             (int)SteamEresult.AccountLogonDenied =>
-                "EYA 令牌已被 Steam 拒绝，可能已被撤销或失效。",
-            _ => $"Steam 登录失败：EResult={result}"
+                Loc.T("Cm_Error_TokenRejected"),
+            _ => Loc.Tf("Cm_Error_LogOnFailed_Format", result)
         };
     }
 }
@@ -139,7 +140,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
         }
 
         throw new InvalidOperationException(
-            $"无法连接到 Steam 服务器。{lastError?.Message}",
+            Loc.Tf("Cm_Error_CannotConnect_Format", lastError?.Message),
             lastError);
     }
 
@@ -160,12 +161,12 @@ internal sealed class SteamCmClient : IAsyncDisposable
             realm: 1,
             cancellationToken);
 
-        EnsureOk(response, "获取 Web access token 失败");
+        EnsureOk(response, Loc.T("Cm_Error_GetAccessTokenFailed"));
 
         var accessToken = DecodeAccessTokenForAppResponse(response.Body);
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            throw new InvalidOperationException("Steam 返回的 Web access token 为空。");
+            throw new InvalidOperationException(Loc.T("Cm_Error_AccessTokenEmpty"));
         }
 
         return accessToken;
@@ -272,7 +273,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
 
             if (!_gcWaiters.TryAdd(key, completion))
             {
-                throw new InvalidOperationException("已有相同的 GC 消息等待任务。");
+                throw new InvalidOperationException(Loc.T("Cm_Error_DuplicateGcWaiter"));
             }
         }
 
@@ -308,7 +309,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
             realm: null,
             cancellationToken);
 
-        EnsureOk(response, "校验订阅状态失败");
+        EnsureOk(response, Loc.T("Cm_Error_CheckSubscriptionFailed"));
         return DecodeAreFilesInSubscriptionListResponse(response.Body, publishedFileId);
     }
 
@@ -354,7 +355,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
         if (!document.RootElement.TryGetProperty("response", out var responseElement) ||
             !responseElement.TryGetProperty("serverlist", out var serverList))
         {
-            throw new InvalidOperationException("Steam CM 列表响应格式不正确。");
+            throw new InvalidOperationException(Loc.T("Cm_Error_ServerListMalformed"));
         }
 
         var servers = serverList.EnumerateArray()
@@ -368,7 +369,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
 
         return servers.Count > 0
             ? servers
-            : throw new InvalidOperationException("Steam 没有返回可用的 WebSocket CM。");
+            : throw new InvalidOperationException(Loc.T("Cm_Error_NoWebSocketServers"));
     }
 
     private async Task ConnectAsync(string endpoint, CancellationToken cancellationToken)
@@ -388,7 +389,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"连接 Steam CM {endpoint} 超时。");
+            throw new TimeoutException(Loc.Tf("Cm_Error_ConnectTimeout_Format", endpoint));
         }
 
         _receiveTask = Task.Run(
@@ -441,7 +442,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
 
         if (!_jobs.TryAdd(jobId, completion))
         {
-            throw new InvalidOperationException("Steam 请求队列创建失败。");
+            throw new InvalidOperationException(Loc.T("Cm_Error_RequestQueueFailed"));
         }
 
         try
@@ -498,7 +499,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
     {
         if (_socket?.State != WebSocketState.Open)
         {
-            throw new InvalidOperationException("Steam CM 尚未连接。");
+            throw new InvalidOperationException(Loc.T("Cm_Error_NotConnected"));
         }
 
         var header = SteamProtoWriter.Build(writer =>
@@ -563,7 +564,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
 
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        FailPendingRequests(new InvalidOperationException("Steam CM 连接已关闭。"));
+                        FailPendingRequests(new InvalidOperationException(Loc.T("Cm_Error_ConnectionClosed")));
                         return;
                     }
 
@@ -602,7 +603,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
             if (eMsg == EMsgClientLogOnResponse)
             {
                 _logonResponse?.TrySetException(
-                    new InvalidOperationException("Steam CM 返回了非 protobuf 登录响应。"));
+                    new InvalidOperationException(Loc.T("Cm_Error_NonProtobufLogon")));
             }
 
             return;
@@ -848,18 +849,23 @@ internal sealed class SteamCmClient : IAsyncDisposable
     private static InvalidOperationException CreateLoggedOffException(byte[] body)
     {
         var reason = TryDecodeLoggedOffEresult(body);
+
+        // Data["CmConflict"] 是语言中立标记，供 CsLoadoutService 判定会话冲突——
+        // 不能用本地化后的 Message 文本做匹配（多语言下会失配）。
         if (reason is (int)SteamEresult.LoggedInElsewhere
             or (int)SteamEresult.LogonSessionReplaced
             or (int)SteamEresult.AlreadyLoggedInElsewhere)
         {
-            return new InvalidOperationException(
-                "Steam CM 连接已被顶替：该账号可能正在 Steam 客户端或 CS2 中运行。" +
-                "请先完全退出 CS2 和 Steam，再在 SteamEYA 中执行配装操作。");
+            var replaced = new InvalidOperationException(Loc.T("Cm_Error_SessionReplaced"));
+            replaced.Data["CmConflict"] = "SessionReplaced";
+            return replaced;
         }
 
-        return new InvalidOperationException(
-            "Steam 账号已下线。" +
-            (reason.HasValue ? $"（EResult={reason.Value}）" : string.Empty));
+        var loggedOff = new InvalidOperationException(
+            Loc.T("Cm_Error_AccountLoggedOff") +
+            (reason.HasValue ? Loc.Tf("Cm_Error_EresultSuffix_Format", reason.Value) : string.Empty));
+        loggedOff.Data["CmConflict"] = "LoggedOff";
+        return loggedOff;
     }
 
     private static int? TryDecodeLoggedOffEresult(byte[] body)
@@ -1154,7 +1160,7 @@ internal sealed class SteamCmClient : IAsyncDisposable
         if (response.Result != (int)SteamEresult.Ok)
         {
             throw new InvalidOperationException(
-                $"{message}：EResult={response.Result} {response.ErrorMessage}");
+                Loc.Tf("Cm_Error_EnsureOk_Format", message, response.Result, response.ErrorMessage));
         }
     }
 

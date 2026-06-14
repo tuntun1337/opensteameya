@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -17,13 +18,13 @@ internal static class FormatHelper
 
     public static string FormatRemaining(TimeSpan remaining)
     {
-        return $"{Math.Floor(remaining.TotalDays)} 天 {remaining.Hours} 小时 {remaining.Minutes} 分钟";
+        return Loc.Tf("Format_Remaining_Format", Math.Floor(remaining.TotalDays), remaining.Hours, remaining.Minutes);
     }
 
     public static string FormatDateTime(DateTimeOffset value)
     {
         return value == default
-            ? "未知时间"
+            ? Loc.T("Format_DateTime_Unknown")
             : value.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
     }
 
@@ -39,20 +40,20 @@ internal static class FormatHelper
 
         if (days > 0)
         {
-            parts.Add($"{days}天");
+            parts.Add(Loc.Tf("Format_Duration_Days_Format", days));
         }
 
         if (hours > 0)
         {
-            parts.Add($"{hours}小时");
+            parts.Add(Loc.Tf("Format_Duration_Hours_Format", hours));
         }
 
         if (minutes > 0)
         {
-            parts.Add($"{minutes}分");
+            parts.Add(Loc.Tf("Format_Duration_Minutes_Format", minutes));
         }
 
-        return parts.Count > 0 ? string.Join("", parts) : $"{seconds}秒";
+        return parts.Count > 0 ? string.Join("", parts) : Loc.Tf("Format_Duration_Seconds_Format", seconds);
     }
 
     // 已知的 GC 冷却原因码映射为可读文案；未知码保留 "原因 N"；
@@ -61,9 +62,9 @@ internal static class FormatHelper
     public static string DescribePenaltyReason(uint? reason) => reason switch
     {
         null => "",
-        7 => "放弃比赛",
+        7 => Loc.T("Format_Penalty_Abandon"),
         22 => "vaclive",
-        _ => $"原因 {reason.Value}"
+        _ => Loc.Tf("Format_Penalty_Reason_Format", reason.Value)
     };
 
     /// <param name="seconds">冷却剩余秒数；null 表示 GC 未下发（未知）。</param>
@@ -77,12 +78,12 @@ internal static class FormatHelper
 
         if (seconds == 0)
         {
-            return "无";
+            return Loc.T("Format_Cooldown_None");
         }
 
         var duration = FormatDuration(seconds.Value);
         var description = DescribePenaltyReason(reason);
-        return description.Length > 0 ? $"{duration}（{description}）" : duration;
+        return description.Length > 0 ? Loc.Tf("Format_Cooldown_WithReason_Format", duration, description) : duration;
     }
 
     /// <param name="vacBanned">GC VAC 标记：null 未知 / 0 无 / 其他 有标记。</param>
@@ -90,8 +91,8 @@ internal static class FormatHelper
     public static string FormatGcVacText(int? vacBanned, string unknownText) => vacBanned switch
     {
         null => unknownText,
-        0 => "无",
-        _ => "有标记"
+        0 => Loc.T("Format_GcVac_None"),
+        _ => Loc.T("Format_GcVac_Flagged")
     };
 
     public static string FormatCooldownStatusText(
@@ -100,8 +101,10 @@ internal static class FormatHelper
         int? vacBanned,
         string cooldownUnknownText,
         string vacUnknownText) =>
-        $"冷却：{FormatCooldownText(seconds, reason, cooldownUnknownText)}；" +
-        $"GC VAC：{FormatGcVacText(vacBanned, vacUnknownText)}";
+        Loc.Tf(
+            "Format_CooldownStatus_Format",
+            FormatCooldownText(seconds, reason, cooldownUnknownText),
+            FormatGcVacText(vacBanned, vacUnknownText));
 
     /// <param name="level">CS 玩家等级；null 时返回 <paramref name="unknownText"/>。</param>
     public static string FormatPlayerLevelText(int? level, string unknownText)
@@ -112,17 +115,17 @@ internal static class FormatHelper
         }
 
         var status = level.Value >= MinimumPremierLevel
-            ? "可打优先"
-            : $"未达 {MinimumPremierLevel} 级";
+            ? Loc.T("Format_PlayerLevel_Eligible")
+            : Loc.Tf("Format_PlayerLevel_Below_Format", MinimumPremierLevel);
 
-        return $"{level.Value} 级（{status}）";
+        return Loc.Tf("Format_PlayerLevel_Format", level.Value, status);
     }
 
     public static string FormatFileSize(long? bytes)
     {
         if (!bytes.HasValue)
         {
-            return "未知大小";
+            return Loc.T("Format_FileSize_Unknown");
         }
 
         return bytes.Value >= 1024 * 1024

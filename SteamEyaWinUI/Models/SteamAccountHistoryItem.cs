@@ -1,12 +1,15 @@
+using System.ComponentModel;
 using System.IO;
 using System.Text.Json.Serialization;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Services;
 
 namespace SteamEyaWinUI.Models;
 
 // partial：实例会作为 ListView ItemsSource 跨越 WinRT ABI，需要 CsWinRT 源生成 vtable（AOT）。
-public sealed partial class SteamAccountHistoryItem
+public sealed partial class SteamAccountHistoryItem : INotifyPropertyChanged
 {
     public string AccountName { get; set; } = "";
 
@@ -53,26 +56,29 @@ public sealed partial class SteamAccountHistoryItem
     public DateTimeOffset? CsStatusUpdatedAt { get; set; }
 
     [JsonIgnore]
-    public string AccountTitle => string.IsNullOrWhiteSpace(AccountName) ? "未命名账号" : AccountName;
+    public string AccountTitle => string.IsNullOrWhiteSpace(AccountName) ? Loc.T("Account_Title_Unnamed") : AccountName;
 
     [JsonIgnore]
-    public string PersonaDisplayName => string.IsNullOrWhiteSpace(PersonaName) ? "Steam 资料未同步" : PersonaName;
+    public string PersonaDisplayName => string.IsNullOrWhiteSpace(PersonaName) ? Loc.T("Account_Persona_NotSynced") : PersonaName;
 
     [JsonIgnore]
-    public string SteamIdDisplay => string.IsNullOrWhiteSpace(SteamId) ? "Steam64 未解析" : SteamId;
+    public string SteamIdDisplay => string.IsNullOrWhiteSpace(SteamId) ? Loc.T("Account_Steam64_Unresolved") : SteamId;
 
     [JsonIgnore]
     public string LastLoginText => FormatHelper.FormatDateTime(LastLoginAt);
 
     [JsonIgnore]
     public string LastLoginShortText => LastLoginAt == default
-        ? "未知"
+        ? Loc.T("Account_LastLogin_Unknown")
         : LastLoginAt.LocalDateTime.ToString("MM-dd HH:mm");
+
+    [JsonIgnore]
+    public string LastLoginCaptionText => Loc.Tf("Account_LastLogin_Caption_Format", LastLoginShortText);
 
     [JsonIgnore]
     public string TokenExpiresText => TokenExpiresAt.HasValue
         ? FormatHelper.FormatDateTime(TokenExpiresAt.Value)
-        : "未解析";
+        : Loc.T("Account_TokenExpires_Unresolved");
 
     [JsonIgnore]
     public string CompetitiveScoreText
@@ -82,11 +88,11 @@ public sealed partial class SteamAccountHistoryItem
             if (PremierScore.HasValue)
             {
                 return PremierWins.HasValue
-                    ? $"{PremierScore.Value:N0}（胜场 {PremierWins.Value}）"
-                    : $"{PremierScore.Value:N0}";
+                    ? Loc.Tf("Account_Score_WithWins_Format", PremierScore.Value, PremierWins.Value)
+                    : string.Format("{0:N0}", PremierScore.Value);
             }
 
-            return string.IsNullOrWhiteSpace(CompetitiveScore) ? "待查询" : CompetitiveScore;
+            return string.IsNullOrWhiteSpace(CompetitiveScore) ? Loc.T("Account_Score_Pending") : CompetitiveScore;
         }
     }
 
@@ -94,39 +100,39 @@ public sealed partial class SteamAccountHistoryItem
     private int? GcVacBannedAsInt => GcVacBanned.HasValue ? (GcVacBanned.Value ? 1 : 0) : null;
 
     [JsonIgnore]
-    public string CooldownText => FormatHelper.FormatCooldownText(CooldownSeconds, CooldownReason, "待查询");
+    public string CooldownText => FormatHelper.FormatCooldownText(CooldownSeconds, CooldownReason, Loc.T("Account_Pending"));
 
     [JsonIgnore]
-    public string CooldownSummaryText => $"冷却：{CooldownText}";
+    public string CooldownSummaryText => Loc.Tf("Account_Cooldown_Summary_Format", CooldownText);
 
     [JsonIgnore]
-    public string GcVacText => FormatHelper.FormatGcVacText(GcVacBannedAsInt, "待查询");
+    public string GcVacText => FormatHelper.FormatGcVacText(GcVacBannedAsInt, Loc.T("Account_Pending"));
 
     [JsonIgnore]
     public string CooldownStatusText =>
-        FormatHelper.FormatCooldownStatusText(CooldownSeconds, CooldownReason, GcVacBannedAsInt, "待查询", "待查询");
+        FormatHelper.FormatCooldownStatusText(CooldownSeconds, CooldownReason, GcVacBannedAsInt, Loc.T("Account_Pending"), Loc.T("Account_Pending"));
 
     [JsonIgnore]
-    public string CsPlayerLevelText => FormatHelper.FormatPlayerLevelText(CsPlayerLevel, "待查询");
+    public string CsPlayerLevelText => FormatHelper.FormatPlayerLevelText(CsPlayerLevel, Loc.T("Account_Pending"));
 
     [JsonIgnore]
     public string InCsMatchText => InCsMatch.HasValue
-        ? (InCsMatch.Value ? "可能在对局中" : "未发现对局")
-        : "待查询";
+        ? (InCsMatch.Value ? Loc.T("Account_InMatch_Maybe") : Loc.T("Account_InMatch_None"))
+        : Loc.T("Account_Pending");
 
     [JsonIgnore]
     public string AccountStatusText
     {
         get
         {
-            var status = string.IsNullOrWhiteSpace(AccountStatus) ? "待查询" : AccountStatus;
+            var status = string.IsNullOrWhiteSpace(AccountStatus) ? Loc.T("Account_Pending") : AccountStatus;
             var updatedAt = CsStatusUpdatedAt ?? PremierScoreUpdatedAt;
             if (!updatedAt.HasValue)
             {
                 return status;
             }
 
-            return $"{status}，{FormatHelper.FormatDateTime(updatedAt.Value)}";
+            return Loc.Tf("Account_Status_WithTime_Format", status, FormatHelper.FormatDateTime(updatedAt.Value));
         }
     }
 
@@ -136,16 +142,16 @@ public sealed partial class SteamAccountHistoryItem
         get
         {
             var status = JwtAvailable.HasValue
-                ? (JwtAvailable.Value ? "有效" : "无效")
+                ? (JwtAvailable.Value ? Loc.T("Account_Jwt_Valid") : Loc.T("Account_Jwt_Invalid"))
                 : JwtStatus;
 
             if (string.IsNullOrWhiteSpace(status))
             {
-                return "待查询";
+                return Loc.T("Account_Pending");
             }
 
             return JwtValidatedAt.HasValue
-                ? $"{status}，{FormatHelper.FormatDateTime(JwtValidatedAt.Value)}"
+                ? Loc.Tf("Account_Status_WithTime_Format", status, FormatHelper.FormatDateTime(JwtValidatedAt.Value))
                 : status;
         }
     }
@@ -214,5 +220,74 @@ public sealed partial class SteamAccountHistoryItem
         }
 
         return null;
+    }
+
+    // ---------- 列表多选 / 悬停的瞬时 UI 状态（不持久化，仅驱动卡片视觉，列表重建后由页面重新套用） ----------
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool _isSelected;
+
+    /// <summary>是否被勾选进批量选择集。</summary>
+    [JsonIgnore]
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            RaiseSelectionVisuals();
+        }
+    }
+
+    private bool _isPointerOver;
+
+    /// <summary>鼠标是否悬停在卡片上（用于悬停时才显示勾选框）。</summary>
+    [JsonIgnore]
+    public bool IsPointerOver
+    {
+        get => _isPointerOver;
+        set
+        {
+            if (_isPointerOver == value)
+            {
+                return;
+            }
+
+            _isPointerOver = value;
+            RaiseSelectionVisuals();
+        }
+    }
+
+    /// <summary>选中时显示：整卡黑框 + 左上角实心对勾。</summary>
+    [JsonIgnore]
+    public Visibility SelectionRingVisibility => _isSelected ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>左上角勾选指示器：悬停或已选时出现。</summary>
+    [JsonIgnore]
+    public Visibility CheckIndicatorVisibility =>
+        _isSelected || _isPointerOver ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>未选中时（指示器可见即仅悬停场景）显示空心圈。</summary>
+    [JsonIgnore]
+    public Visibility EmptyCheckCircleVisibility => _isSelected ? Visibility.Collapsed : Visibility.Visible;
+
+    private void RaiseSelectionVisuals()
+    {
+        var handler = PropertyChanged;
+        if (handler is null)
+        {
+            return;
+        }
+
+        handler(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        handler(this, new PropertyChangedEventArgs(nameof(SelectionRingVisibility)));
+        handler(this, new PropertyChangedEventArgs(nameof(CheckIndicatorVisibility)));
+        handler(this, new PropertyChangedEventArgs(nameof(EmptyCheckCircleVisibility)));
     }
 }

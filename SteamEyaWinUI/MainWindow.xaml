@@ -44,10 +44,10 @@
             IsTitleBarAutoPaddingEnabled="False"
             Background="Transparent"
             SelectionChanged="RootNavigationView_SelectionChanged">
+            <!-- 导航项文字由 MainWindow.RefreshNavText() 按当前语言在代码里设置（构造时即设、语言切换时刷新）。 -->
             <NavigationView.MenuItems>
                 <NavigationViewItem
                     x:Name="LoginNavItem"
-                    Content="登录"
                     Tag="login">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8D4;" />
@@ -56,7 +56,6 @@
 
                 <NavigationViewItem
                     x:Name="HistoryNavItem"
-                    Content="历史账号"
                     Tag="history">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE81C;" />
@@ -64,17 +63,29 @@
                 </NavigationViewItem>
                 <NavigationViewItem
                     x:Name="CachedAccountsNavItem"
-                    Content="已缓存账号"
                     Tag="cachedAccounts">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE777;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem
+                    x:Name="LoadoutNavItem"
+                    Tag="loadout">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7C1;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
                 <NavigationViewItem
+                    x:Name="SettingsNavItem"
+                    Tag="settings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem
                     x:Name="AboutNavItem"
-                    Content="关于"
                     Tag="about">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE946;" />
@@ -111,8 +122,7 @@
                         Grid.Column="1"
                         IsOpen="True"
                         IsClosable="False"
-                        Severity="Informational"
-                        Message="准备就绪" />
+                        Severity="Informational" />
                 </Grid>
             </Grid>
         </NavigationView>

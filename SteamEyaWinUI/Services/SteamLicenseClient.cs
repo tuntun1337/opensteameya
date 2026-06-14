@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -39,19 +40,19 @@ internal sealed class SteamLicenseClient
     {
         if (string.IsNullOrWhiteSpace(licenseKey))
         {
-            throw new ArgumentException("请输入卡密。", nameof(licenseKey));
+            throw new ArgumentException(Loc.T("License_Error_EmptyKey"), nameof(licenseKey));
         }
 
         var url = $"{server.BaseUrl.TrimEnd('/')}{KeyDataPath}{Uri.EscapeDataString(licenseKey.Trim())}";
         using var response = await DefaultHttpClient.GetAsync(url, cancellationToken);
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
-            throw new InvalidOperationException("卡密不合法或上游服务器选择有误。");
+            throw new InvalidOperationException(Loc.T("License_Error_InvalidKeyOrServer"));
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            throw new InvalidOperationException("卡密有误或上游服务器选择有误。");
+            throw new InvalidOperationException(Loc.T("License_Error_WrongKeyOrServer"));
         }
 
         response.EnsureSuccessStatusCode();
@@ -65,7 +66,7 @@ internal sealed class SteamLicenseClient
     {
         if (raw.Length <= HeaderSkipBytes)
         {
-            throw new InvalidDataException("上游服务器返回内容过短。");
+            throw new InvalidDataException(Loc.T("License_Error_ResponseTooShort"));
         }
 
         using var input = new MemoryStream(raw, HeaderSkipBytes, raw.Length - HeaderSkipBytes, writable: false);
@@ -84,7 +85,7 @@ internal sealed class SteamLicenseClient
             JsonValueKind.Array when document.RootElement.GetArrayLength() > 0 =>
                 document.RootElement[0],
             JsonValueKind.Array =>
-                throw new JsonException("上游 JSON 没有账号数据。"),
+                throw new JsonException(Loc.T("License_Error_NoAccountData")),
             _ => document.RootElement
         };
 
@@ -99,13 +100,13 @@ internal sealed class SteamLicenseClient
         if (!root.TryGetProperty(name, out var value) ||
             value.ValueKind != JsonValueKind.String)
         {
-            throw new JsonException($"上游 JSON 缺少字段：{name}");
+            throw new JsonException(Loc.Tf("License_Error_MissingField_Format", name));
         }
 
         var text = value.GetString();
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new JsonException($"上游 JSON 字段为空：{name}");
+            throw new JsonException(Loc.Tf("License_Error_EmptyField_Format", name));
         }
 
         return text;

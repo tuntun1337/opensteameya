@@ -1,3 +1,4 @@
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -23,14 +24,14 @@ internal sealed class SteamTokenOnlineValidationService
 
         if (string.IsNullOrWhiteSpace(tokenInfo.SteamId))
         {
-            return new SteamTokenOnlineValidationResult(false, "EYA 令牌缺少 SteamID。");
+            return new SteamTokenOnlineValidationResult(false, Loc.T("Jwt_Status_MissingSteamId"));
         }
 
         await using var cmClient = new SteamCmClient(HttpClient);
         try
         {
             await cmClient.ConnectAndLogOnAsync(refreshToken, tokenInfo.SteamId, cancellationToken);
-            return new SteamTokenOnlineValidationResult(true, "Steam 已接受该令牌。");
+            return new SteamTokenOnlineValidationResult(true, Loc.T("Token_Result_Accepted"));
         }
         catch (SteamCmException ex) when (ex.IsTokenFailure)
         {

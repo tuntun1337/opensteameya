@@ -1,3 +1,5 @@
+using SteamEyaWinUI.Localization;
+
 namespace SteamEyaWinUI.Services;
 
 internal static class CsGcSession
@@ -51,7 +53,7 @@ internal static class CsGcSession
             }
         }
 
-        throw new TimeoutException("连接 CS2 Game Coordinator 超时。");
+        throw new TimeoutException(Loc.T("Cs_Gc_ConnectTimeout"));
     }
 
     public static byte[] EncodeClientHello()

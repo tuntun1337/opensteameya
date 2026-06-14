@@ -1,3 +1,4 @@
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -18,22 +19,22 @@ internal sealed class SteamLoginService
             $"==== 开始上号：账号=\"{accountName}\"  OS={Environment.OSVersion}  64位进程={Environment.Is64BitProcess} ====");
         try
         {
-            progress?.Report("正在校验 EYA 令牌...");
+            progress?.Report(Loc.T("Steam_Progress_ValidatingToken"));
             var token = _jwtTokenService.Validate(eyaToken);
             AppLog.Info($"EYA 令牌校验通过：SteamID={token.SteamId} 过期={token.ExpiresAt:yyyy-MM-dd HH:mm:ss}");
 
-            progress?.Report("正在定位 Steam 安装目录...");
+            progress?.Report(Loc.T("Steam_Progress_LocatingInstall"));
             var paths = _steamPathService.GetSteamPaths();
             var cachedAccountCandidates = _steamConfigService.GetLoginAccounts(paths);
 
-            progress?.Report("正在加密 EYA 令牌...");
+            progress?.Report(Loc.T("Steam_Progress_EncryptingToken"));
             var encryptedJwt = _steamCryptoService.EncryptToHex(eyaToken, accountName);
             var accountCrc32 = Crc32.ComputeSteamAccountKey(accountName);
             AppLog.Info($"令牌已加密（{encryptedJwt.Length} hex 字符）；ConnectCache key={accountCrc32}");
 
             _steamProcessService.EnsureSteamStopped(paths, progress);
 
-            progress?.Report("正在写入 Steam 登录配置...");
+            progress?.Report(Loc.T("Steam_Progress_WritingConfig"));
             if (cachedAccountCandidates.Count == 0)
             {
                 cachedAccountCandidates = _steamConfigService.GetLoginAccounts(paths);
@@ -48,7 +49,7 @@ internal sealed class SteamLoginService
                 encryptedJwt,
                 accountCrc32);
 
-            progress?.Report("正在启动 Steam...");
+            progress?.Report(Loc.T("Steam_Progress_StartingSteam"));
             _steamProcessService.LaunchSteamWithLogin(paths, accountName);
 
             AppLog.Info("==== 上号流程完成（已请求启动 Steam）====");
@@ -76,15 +77,15 @@ internal sealed class SteamLoginService
 
         try
         {
-            progress?.Report("正在定位 Steam 安装目录...");
+            progress?.Report(Loc.T("Steam_Progress_LocatingInstall"));
             var paths = _steamPathService.GetSteamPaths();
 
             _steamProcessService.EnsureSteamStopped(paths, progress);
 
-            progress?.Report("正在恢复 Steam 登录配置...");
+            progress?.Report(Loc.T("Steam_Progress_RestoringConfig"));
             _steamConfigService.RestoreLoginFiles(paths, account);
 
-            progress?.Report("正在启动 Steam...");
+            progress?.Report(Loc.T("Steam_Progress_StartingSteam"));
             _steamProcessService.LaunchSteamWithLogin(paths, account.AccountName);
 
             AppLog.Info($"==== 已请求恢复缓存账号：{account.AccountName} ({account.SteamId}) ====");

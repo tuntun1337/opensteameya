@@ -1,4 +1,5 @@
 using System.Text;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -22,7 +23,7 @@ internal static class VdfDocument
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                $"无法读取 {Path.GetFileName(path)}，已停止以避免覆盖现有 Steam 配置。{ex.Message}",
+                Loc.Tf("Steam_Error_VdfReadFailed_Format", Path.GetFileName(path), ex.Message),
                 ex);
         }
     }
@@ -123,7 +124,7 @@ internal static class VdfDocument
             var document = ParseObject();
             if (_position != _tokens.Count)
             {
-                throw new FormatException("VDF 文件包含无法解析的多余内容。");
+                throw new FormatException(Loc.T("Steam_Error_Vdf_TrailingContent"));
             }
 
             return document;
@@ -143,12 +144,12 @@ internal static class VdfDocument
                 var key = Read();
                 if (key is "{" or "}")
                 {
-                    throw new FormatException("VDF 键名位置不正确。");
+                    throw new FormatException(Loc.T("Steam_Error_Vdf_BadKeyPosition"));
                 }
 
                 if (_position >= _tokens.Count)
                 {
-                    throw new FormatException("VDF 键缺少对应的值。");
+                    throw new FormatException(Loc.T("Steam_Error_Vdf_MissingValue"));
                 }
 
                 if (Peek() == "{")
@@ -174,7 +175,7 @@ internal static class VdfDocument
         {
             if (_position >= _tokens.Count || Read() != expected)
             {
-                throw new FormatException($"VDF 缺少 {expected}。");
+                throw new FormatException(Loc.Tf("Steam_Error_Vdf_MissingExpected_Format", expected));
             }
         }
 
@@ -287,7 +288,7 @@ internal static class VdfDocument
                 builder.Append(current);
             }
 
-            throw new FormatException("VDF 引号字符串没有结束。");
+            throw new FormatException(Loc.T("Steam_Error_Vdf_UnterminatedString"));
         }
 
         private static string ReadBare(string text, ref int index)

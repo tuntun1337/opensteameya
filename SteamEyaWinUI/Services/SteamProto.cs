@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using SteamEyaWinUI.Localization;
 
 namespace SteamEyaWinUI.Services;
 
@@ -178,7 +179,7 @@ internal sealed class SteamProtoReader
                 break;
 
             default:
-                throw new InvalidOperationException($"不支持的 protobuf wire type：{wireType}");
+                throw new InvalidOperationException(Loc.Tf("Cm_Proto_UnsupportedWireType_Format", wireType));
         }
     }
 
@@ -201,7 +202,7 @@ internal sealed class SteamProtoReader
             shift += 7;
         }
 
-        throw new InvalidOperationException("protobuf varint 过长。");
+        throw new InvalidOperationException(Loc.T("Cm_Proto_VarintTooLong"));
     }
 
     private static void EnsureWireType(int actual, int expected)
@@ -209,7 +210,7 @@ internal sealed class SteamProtoReader
         if (actual != expected)
         {
             throw new InvalidOperationException(
-                $"protobuf wire type 不匹配：实际 {actual}，期望 {expected}。");
+                Loc.Tf("Cm_Proto_WireTypeMismatch_Format", actual, expected));
         }
     }
 
@@ -217,7 +218,7 @@ internal sealed class SteamProtoReader
     {
         if (length < 0 || _offset + length > _data.Length)
         {
-            throw new InvalidOperationException("protobuf 数据不完整。");
+            throw new InvalidOperationException(Loc.T("Cm_Proto_Incomplete"));
         }
     }
 }

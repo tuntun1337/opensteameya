@@ -1,3 +1,4 @@
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Services;
 
 namespace SteamEyaWinUI.Models;
@@ -27,17 +28,17 @@ public sealed record CsPremierScoreResult(
     public bool? GcVacBannedOrUnknown => VacBanned is null ? null : VacBanned != 0;
 
     public string DisplayText => HasPremierScore
-        ? $"{PremierRanking!.RankId:N0}（胜场 {PremierRanking.Wins}）"
-        : "暂无优先分";
+        ? Loc.Tf("Account_Score_WithWins_Format", PremierRanking!.RankId, PremierRanking.Wins)
+        : Loc.T("Cs_Premier_NoScore");
 
-    public string CooldownText => FormatHelper.FormatCooldownText(PenaltySeconds, PenaltyReason, "未知（GC 未响应）");
+    public string CooldownText => FormatHelper.FormatCooldownText(PenaltySeconds, PenaltyReason, Loc.T("Cs_Unknown_GcNoResponse"));
 
-    public string GcVacText => FormatHelper.FormatGcVacText(VacBanned, "未知");
+    public string GcVacText => FormatHelper.FormatGcVacText(VacBanned, Loc.T("Cs_Unknown"));
 
     public string CooldownStatusText =>
-        FormatHelper.FormatCooldownStatusText(PenaltySeconds, PenaltyReason, VacBanned, "未知（GC 未响应）", "未知");
+        FormatHelper.FormatCooldownStatusText(PenaltySeconds, PenaltyReason, VacBanned, Loc.T("Cs_Unknown_GcNoResponse"), Loc.T("Cs_Unknown"));
 
-    public string PlayerLevelText => FormatHelper.FormatPlayerLevelText(PlayerLevel, "未读取");
+    public string PlayerLevelText => FormatHelper.FormatPlayerLevelText(PlayerLevel, Loc.T("Cs_PlayerLevel_NotRead"));
 
     public string StatusText
     {
@@ -46,25 +47,25 @@ public sealed record CsPremierScoreResult(
             var restrictions = new List<string>();
             if (IsGcVacBanned)
             {
-                restrictions.Add("GC 标记 VAC");
+                restrictions.Add(Loc.T("Cs_Premier_Restriction_GcVac"));
             }
 
             if (HasCooldown)
             {
                 var kind = PenaltySeconds > 365U * 86400U
-                    ? "长期/永久竞技封禁"
-                    : "竞技冷却";
-                restrictions.Add($"{kind}：{CooldownText}");
+                    ? Loc.T("Cs_Premier_Cooldown_LongBan")
+                    : Loc.T("Cs_Premier_Cooldown_Normal");
+                restrictions.Add(Loc.Tf("Cs_Premier_Restriction_Format", kind, CooldownText));
             }
 
             if (restrictions.Count > 0)
             {
-                return string.Join("；", restrictions);
+                return string.Join(Loc.T("Cs_Premier_Restriction_Separator"), restrictions);
             }
 
             return HasCooldownData
-                ? "未发现 CS2 限制"
-                : "冷却状态未知（GC 未响应，可稍后重试）";
+                ? Loc.T("Cs_Premier_NoRestrictions")
+                : Loc.T("Cs_Premier_CooldownUnknown");
         }
     }
 }

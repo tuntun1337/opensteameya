@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json.Serialization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Services;
 
 namespace SteamEyaWinUI.Models;
@@ -30,23 +31,26 @@ public sealed partial class CachedSteamLoginAccount : INotifyPropertyChanged
     public string CacheKey => string.IsNullOrWhiteSpace(SteamId) ? $"name:{AccountName}" : $"id:{SteamId}";
 
     [JsonIgnore]
-    public string AccountTitle => string.IsNullOrWhiteSpace(AccountName) ? "未知账号" : AccountName;
+    public string AccountTitle => string.IsNullOrWhiteSpace(AccountName) ? Loc.T("Cached_Title_Unknown") : AccountName;
 
     [JsonIgnore]
-    public string PersonaDisplayName => string.IsNullOrWhiteSpace(PersonaName) ? "Steam 资料未同步" : PersonaName;
+    public string PersonaDisplayName => string.IsNullOrWhiteSpace(PersonaName) ? Loc.T("Cached_Persona_NotSynced") : PersonaName;
 
     [JsonIgnore]
-    public string SteamIdDisplay => string.IsNullOrWhiteSpace(SteamId) ? "Steam64 未记录" : SteamId;
+    public string SteamIdDisplay => string.IsNullOrWhiteSpace(SteamId) ? Loc.T("Cached_Steam64_NotRecorded") : SteamId;
 
     [JsonIgnore]
     public string CachedAtText => CachedAt == default
-        ? "未知时间"
+        ? Loc.T("Cached_CachedAt_UnknownTime")
         : CachedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
 
     [JsonIgnore]
     public string CachedAtShortText => CachedAt == default
-        ? "未知"
+        ? Loc.T("Cached_CachedAt_Unknown")
         : CachedAt.LocalDateTime.ToString("MM-dd HH:mm");
+
+    [JsonIgnore]
+    public string CachedAtCaptionText => Loc.Tf("Cached_Card_CachedAt_Caption_Format", CachedAtShortText);
 
     // 进程级头像缓存：列表重建会换新实例，仅靠实例字段无法跨重建复用，必须用静态字典才真正止血。
     // 键 = 完整路径 + 最后写入时间，头像更新（重新下载覆盖同名文件）后键变化自动失效。

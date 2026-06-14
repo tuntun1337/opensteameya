@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -15,8 +16,8 @@ public sealed class JwtTokenService
         }
 
         return new JwtValidationResult(
-            info.SteamId ?? throw new InvalidOperationException("EYA 令牌缺少 SteamID。"),
-            info.ExpiresAt ?? throw new InvalidOperationException("EYA 令牌缺少过期时间。"));
+            info.SteamId ?? throw new InvalidOperationException(Loc.T("Jwt_Status_MissingSteamId")),
+            info.ExpiresAt ?? throw new InvalidOperationException(Loc.T("Jwt_Status_MissingExpiry")));
     }
 
     public JwtTokenInfo Inspect(string refreshToken)
@@ -24,7 +25,7 @@ public sealed class JwtTokenService
         var parts = refreshToken.Split('.');
         if (parts.Length != 3)
         {
-            return Invalid("EYA 令牌格式不正确。");
+            return Invalid(Loc.T("Jwt_Status_BadFormat"));
         }
 
         JsonDocument payload;
@@ -34,7 +35,7 @@ public sealed class JwtTokenService
         }
         catch (Exception)
         {
-            return Invalid("EYA 令牌无法解析。");
+            return Invalid(Loc.T("Jwt_Status_Unparseable"));
         }
 
         // 输入可能来自剪贴板等不可信来源，payload 的字段类型不能假设：
@@ -45,49 +46,49 @@ public sealed class JwtTokenService
         var root = payload.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return Invalid("EYA 令牌无法解析。");
+            return Invalid(Loc.T("Jwt_Status_Unparseable"));
         }
 
         if (!root.TryGetProperty("iss", out var issuer) ||
             issuer.ValueKind != JsonValueKind.String ||
             issuer.GetString() != "steam")
         {
-            return Invalid("EYA 令牌不是 Steam 令牌。");
+            return Invalid(Loc.T("Jwt_Status_NotSteamToken"));
         }
 
         if (!HasClientAudience(root))
         {
-            return Invalid("EYA 令牌缺少 client 授权。", GetSteamId(root), GetExpiresAt(root));
+            return Invalid(Loc.T("Jwt_Status_MissingClientAudience"), GetSteamId(root), GetExpiresAt(root));
         }
 
         if (!root.TryGetProperty("sub", out var subject))
         {
-            return Invalid("EYA 令牌缺少 SteamID。", expiresAt: GetExpiresAt(root));
+            return Invalid(Loc.T("Jwt_Status_MissingSteamId"), expiresAt: GetExpiresAt(root));
         }
 
         if (!root.TryGetProperty("exp", out var exp))
         {
-            return Invalid("EYA 令牌缺少过期时间。", GetSteamId(root));
+            return Invalid(Loc.T("Jwt_Status_MissingExpiry"), GetSteamId(root));
         }
 
         var steamId = subject.ValueKind == JsonValueKind.String ? subject.GetString() : null;
         if (string.IsNullOrWhiteSpace(steamId))
         {
-            return Invalid("EYA 令牌中的 SteamID 为空。", expiresAt: GetExpiresAt(root));
+            return Invalid(Loc.T("Jwt_Status_EmptySteamId"), expiresAt: GetExpiresAt(root));
         }
 
         if (exp.ValueKind != JsonValueKind.Number ||
             !exp.TryGetInt64(out var expSeconds) ||
             FromUnixSecondsSafe(expSeconds) is not { } expiresAt)
         {
-            return Invalid("EYA 令牌过期时间无法解析。", steamId);
+            return Invalid(Loc.T("Jwt_Status_ExpiryUnparseable"), steamId);
         }
 
         var now = DateTimeOffset.Now;
         var remaining = expiresAt - now;
         if (expiresAt <= now)
         {
-            return new JwtTokenInfo(steamId, expiresAt, false, "EYA 令牌已过期。", remaining);
+            return new JwtTokenInfo(steamId, expiresAt, false, Loc.T("Jwt_Status_Expired"), remaining);
         }
 
         if (root.TryGetProperty("nbf", out var notBeforeElement) &&
@@ -96,10 +97,10 @@ public sealed class JwtTokenService
             FromUnixSecondsSafe(nbfSeconds) is { } notBefore &&
             notBefore > now)
         {
-            return new JwtTokenInfo(steamId, expiresAt, false, "EYA 令牌尚未生效。", remaining);
+            return new JwtTokenInfo(steamId, expiresAt, false, Loc.T("Jwt_Status_NotYetValid"), remaining);
         }
 
-        return new JwtTokenInfo(steamId, expiresAt, true, "EYA 令牌有效。", remaining);
+        return new JwtTokenInfo(steamId, expiresAt, true, Loc.T("Jwt_Status_Valid"), remaining);
         }
     }
 

@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:SteamEyaWinUI.Models"
+    xmlns:loc="using:SteamEyaWinUI.Localization"
     NavigationCacheMode="Required">
 
     <Grid Padding="32,24,32,16" RowSpacing="16">
@@ -19,10 +20,10 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Spacing="4">
-                <TextBlock Text="已缓存账号" Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock Text="{x:Bind Strings.Get('Cached_Title'), Mode=OneWay}" Style="{StaticResource PageTitleTextStyle}" />
                 <TextBlock
                     x:Name="CachedSummaryText"
-                    Text="使用 EYA 登录前检测到的原 Steam 登录账号会记录在这里。"
+                    Text="{x:Bind Strings.Get('Cached_Summary_Empty'), Mode=OneWay}"
                     Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
 
@@ -31,7 +32,7 @@
                 Grid.Column="1"
                 Width="240"
                 VerticalAlignment="Center"
-                PlaceholderText="搜索账号名 / 昵称 / Steam64"
+                PlaceholderText="{x:Bind Strings.Get('Cached_Search_Placeholder'), Mode=OneWay}"
                 QueryIcon="Find"
                 TextChanged="CachedSearchBox_TextChanged" />
 
@@ -42,7 +43,7 @@
                 Click="RefreshCachedButton_Click">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE72C;" FontSize="16" />
-                    <TextBlock Text="刷新" />
+                    <TextBlock Text="{x:Bind Strings.Get('Common_Refresh'), Mode=OneWay}" />
                 </StackPanel>
             </Button>
         </Grid>
@@ -59,31 +60,16 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button
-                        x:Name="ClearCachedButton"
-                        Click="ClearCachedButton_Click"
-                        ToolTipService.ToolTip="清空全部缓存账号">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE75C;" FontSize="16" />
-                            <TextBlock Text="清空" />
-                        </StackPanel>
-                    </Button>
-
-                    <TextBlock
-                        x:Name="CachedHintText"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="悬停卡片左上角可勾选，支持多选删除" />
-                </Grid>
+                <Button
+                    x:Name="ClearCachedButton"
+                    HorizontalAlignment="Left"
+                    Click="ClearCachedButton_Click"
+                    ToolTipService.ToolTip="{x:Bind Strings.Get('Cached_Clear_Tooltip'), Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE75C;" FontSize="16" />
+                        <TextBlock Text="{x:Bind Strings.Get('Common_Clear'), Mode=OneWay}" />
+                    </StackPanel>
+                </Button>
 
                 <ListView
                     x:Name="CachedAccountList"
@@ -143,23 +129,21 @@
                                                 Style="{StaticResource CaptionTextBlockStyle}"
                                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                 TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Text="{x:Bind CachedAtCaptionText}"
+                                                Style="{StaticResource CaptionTextBlockStyle}"
+                                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
 
-                                        <StackPanel
+                                        <Button
                                             Grid.Column="2"
-                                            MinWidth="96"
-                                            Spacing="4"
+                                            Padding="9,7"
                                             VerticalAlignment="Center"
-                                            HorizontalAlignment="Right">
-                                            <TextBlock
-                                                Text="缓存时间"
-                                                HorizontalAlignment="Right"
-                                                Style="{StaticResource CaptionTextBlockStyle}"
-                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock
-                                                Text="{x:Bind CachedAtShortText}"
-                                                HorizontalAlignment="Right" />
-                                        </StackPanel>
+                                            Click="CachedCardDelete_Click"
+                                            ToolTipService.ToolTip="{loc:Localize Key=Cached_Card_Delete}">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                        </Button>
                                     </Grid>
                                 </Border>
 
@@ -182,7 +166,7 @@
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     Click="CachedCardCheck_Click"
-                                    ToolTipService.ToolTip="勾选以批量操作"
+                                    ToolTipService.ToolTip="{loc:Localize Key=Common_CheckToBatch}"
                                     Visibility="{x:Bind CheckIndicatorVisibility, Mode=OneWay}">
                                     <Button.Resources>
                                         <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
@@ -238,13 +222,13 @@
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <TextBlock
                         x:Name="CachedEmptyText"
-                        Text="暂无缓存账号"
+                        Text="{x:Bind Strings.Get('Cached_Empty_None'), Mode=OneWay}"
                         FontSize="16"
                         HorizontalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <TextBlock
                         x:Name="CachedEmptyHintText"
-                        Text="先正常登录 Steam，再使用 EYA 登录，原 Steam 账号会自动缓存。"
+                        Text="{x:Bind Strings.Get('Cached_Empty_None_Hint'), Mode=OneWay}"
                         HorizontalAlignment="Center"
                         Style="{StaticResource CaptionTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -272,21 +256,20 @@
                         <TextBlock
                             x:Name="BatchSelectionText"
                             VerticalAlignment="Center"
-                            FontWeight="SemiBold"
-                            Text="已选 0 项" />
+                            FontWeight="SemiBold" />
                         <Button
                             x:Name="BatchClearButton"
                             Grid.Column="1"
                             Click="BatchClearButton_Click"
-                            Content="取消选择" />
+                            Content="{x:Bind Strings.Get('Common_ClearSelection'), Mode=OneWay}" />
                         <Button
                             x:Name="BatchDeleteButton"
                             Grid.Column="2"
                             Click="BatchDeleteButton_Click"
-                            ToolTipService.ToolTip="删除所选缓存账号">
+                            ToolTipService.ToolTip="{x:Bind Strings.Get('Cached_BatchDelete_Tooltip'), Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                                <TextBlock Text="批量删除" />
+                                <TextBlock Text="{x:Bind Strings.Get('Common_BatchDelete'), Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -300,34 +283,34 @@
                             x:Name="CachedDetailAvatar"
                             Width="92"
                             Height="92"
-                            DisplayName="未选择" />
+                            DisplayName="{x:Bind Strings.Get('Cached_Detail_Avatar_None'), Mode=OneWay}" />
                         <TextBlock
-                            Text="账号详情"
+                            Text="{x:Bind Strings.Get('Cached_Detail_Title'), Mode=OneWay}"
                             HorizontalAlignment="Center"
                             Style="{StaticResource SectionTitleTextStyle}" />
                         <TextBlock
                             x:Name="CachedDetailAccountNameText"
-                            Text="未选择账号"
+                            Text="{x:Bind Strings.Get('Cached_Detail_NoSelection'), Mode=OneWay}"
                             FontSize="20"
                             FontWeight="SemiBold"
                             HorizontalAlignment="Center"
                             TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="CachedDetailPersonaText"
-                            Text="Steam 资料未同步"
+                            Text="{x:Bind Strings.Get('Cached_Detail_PersonaUnsynced'), Mode=OneWay}"
                             HorizontalAlignment="Center"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="CachedDetailSteamIdText"
-                            Text="Steam64 未记录"
+                            Text="{x:Bind Strings.Get('Cached_Detail_SteamIdMissing'), Mode=OneWay}"
                             IsTextSelectionEnabled="True"
                             HorizontalAlignment="Center"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="CachedDetailTimeText"
-                            Text="暂无缓存时间"
+                            Text="{x:Bind Strings.Get('Cached_Detail_TimeNone'), Mode=OneWay}"
                             HorizontalAlignment="Center"
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -340,7 +323,7 @@
                         Click="RestoreSelectedCachedButton_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE777;" FontSize="16" />
-                            <TextBlock Text="恢复该账号登录" />
+                            <TextBlock Text="{x:Bind Strings.Get('Cached_Restore_Button'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

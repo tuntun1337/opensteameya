@@ -24,10 +24,9 @@
                     <TextBlock Text="SteamEYA" Style="{StaticResource PageTitleTextStyle}" />
                     <TextBlock
                         x:Name="AboutVersionText"
-                        Text="当前版本：读取中"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <TextBlock
-                        Text="通过 EYA 令牌登录 Steam、清理创意工坊订阅、查询账号状态。"
+                        Text="{x:Bind Strings.Get('About_Subtitle'), Mode=OneWay}"
                         Style="{StaticResource PageSubtitleTextStyle}" />
                 </StackPanel>
             </StackPanel>
@@ -35,7 +34,9 @@
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="12">
                     <Grid>
-                        <TextBlock Text="自动更新" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            Text="{x:Bind Strings.Get('About_Update_Section'), Mode=OneWay}"
+                            Style="{StaticResource SectionTitleTextStyle}" />
                         <ProgressRing
                             x:Name="UpdateCheckingRing"
                             Width="18"
@@ -47,22 +48,18 @@
 
                     <TextBlock
                         x:Name="AboutUpdateStatusText"
-                        Text="启动时会自动检查 GitHub Releases。"
                         TextWrapping="Wrap" />
                     <TextBlock
                         x:Name="AboutArtifactText"
-                        Text="最新成品：未检查"
                         Style="{StaticResource FieldLabelTextStyle}"
                         TextWrapping="Wrap" />
                     <TextBlock
                         x:Name="AboutUpdateCheckedText"
-                        Text="检查时间：未检查"
                         Style="{StaticResource FieldLabelTextStyle}"
                         TextWrapping="Wrap" />
                     <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
                         <TextBlock
                             x:Name="AboutChangelogText"
-                            Text="更新日志：未检查"
                             TextWrapping="Wrap" />
                     </ScrollViewer>
 
@@ -70,7 +67,7 @@
                         <Button x:Name="CheckUpdateButton" Click="CheckUpdateButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE895;" FontSize="16" />
-                                <TextBlock Text="检查更新" />
+                                <TextBlock Text="{x:Bind Strings.Get('About_Btn_CheckUpdate'), Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                         <Button
@@ -80,13 +77,13 @@
                             Click="DownloadUpdateButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE896;" FontSize="16" />
-                                <TextBlock Text="下载更新" />
+                                <TextBlock Text="{x:Bind Strings.Get('About_Btn_DownloadUpdate'), Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                         <Button x:Name="OpenReleaseButton" Click="OpenReleaseButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE8A5;" FontSize="16" />
-                                <TextBlock Text="发布页" />
+                                <TextBlock Text="{x:Bind Strings.Get('About_Btn_ReleasePage'), Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -95,7 +92,9 @@
 
             <Border Style="{StaticResource CardBorderStyle}">
                 <StackPanel Spacing="12">
-                    <TextBlock Text="开源仓库" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock
+                        Text="{x:Bind Strings.Get('About_Repo_Section'), Mode=OneWay}"
+                        Style="{StaticResource SectionTitleTextStyle}" />
                     <TextBlock
                         Text="https://github.com/tuntun1337/opensteameya"
                         IsTextSelectionEnabled="True"
@@ -107,7 +106,7 @@
                         Click="OpenGitHubButton_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE774;" FontSize="16" />
-                            <TextBlock Text="打开 GitHub" />
+                            <TextBlock Text="{x:Bind Strings.Get('About_Btn_OpenGitHub'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

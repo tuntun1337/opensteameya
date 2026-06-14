@@ -1,17 +1,21 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 using SteamEyaWinUI.Services;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace SteamEyaWinUI.Pages;
 
-public sealed partial class HistoryPage : Page
+public sealed partial class HistoryPage : Page, INotifyPropertyChanged
 {
+    private readonly DispatcherQueue _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
     private readonly ObservableCollection<SteamAccountHistoryItem> _viewItems = [];
     private readonly ObservableCollection<AccountImportEntry> _importEntries = [];
 
@@ -39,6 +43,12 @@ public sealed partial class HistoryPage : Page
     /// </summary>
     private bool _isDialogFlowActive;
 
+    /// <summary>
+    /// 批量选择集（账号键）。与 ListView 的单选（详情焦点）解耦：勾选卡片左上角复选框进入此集，
+    /// 驱动卡片黑框+对勾与底部批量操作栏。按键存储以便跨列表重建（换新实例）保留勾选。
+    /// </summary>
+    private readonly HashSet<string> _checkedKeys = new(StringComparer.OrdinalIgnoreCase);
+
     public HistoryPage()
     {
         InitializeComponent();
@@ -52,12 +62,31 @@ public sealed partial class HistoryPage : Page
 
         AppState.HistoryChanged += OnHistoryChanged;
         AppState.BusyChanged += _ => UpdateControlsEnabled();
+        Loc.LanguageChanged += OnLanguageChanged;
 
         // 取用页面创建前积累的选中意图（首次构造时 _viewItems 为空，GetSelectedSteamId 必为 null）。
         var pending = AppState.PendingHistorySelection;
         AppState.PendingHistorySelection = null;
         _allItems = AppState.HistoryAccounts;
         RebuildView(pending);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>XAML 绑定入口：{x:Bind Strings.Get('Key'), Mode=OneWay}。</summary>
+    internal LocalizedStrings Strings => Loc.Strings;
+
+    private void OnLanguageChanged()
+    {
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            // 静态 x:Bind 文本随 Strings 重算；命令式文本（详情/批量栏/摘要/控件状态）重跑对应方法即可换语言。
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Strings)));
+            UpdateSummaryTexts();
+            UpdateBatchBar();
+            UpdateDetail();
+            UpdateControlsEnabled();
+        });
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -77,11 +106,17 @@ public sealed partial class HistoryPage : Page
         _isActive = false;
         // 停掉去抖计时器，避免离开页面后 300ms 窗口内 Tick 仍对离屏页面触发一次无谓重建。
         _searchDebounceTimer.Stop();
+
+        // 悬停时被导航走，PointerExited 可能不触发；清掉残留悬停态，避免回来后空心勾选圈残留。
+        foreach (var account in _allItems)
+        {
+            account.IsPointerOver = false;
+        }
     }
 
     private void CancelHistoryQueryButton_Click(object sender, RoutedEventArgs e)
     {
-        AppState.ShowStatus("正在取消...", InfoBarSeverity.Informational);
+        AppState.ShowStatus(Loc.T("History_Status_Canceling"), InfoBarSeverity.Informational);
         AppState.CancelBusyOperation();
     }
 
@@ -108,18 +143,22 @@ public sealed partial class HistoryPage : Page
             ? source
             : source.Where(account => Matches(account, filter)).ToList();
 
-        // 重建会清掉 ListView 的选中态，且列表元素每次都是新实例；
-        // 先按账号键记住当前（可能是多项）选择，重建后恢复——后台资料同步等
-        // 延迟触发的刷新不应把用户进行中的多选打回单选。
-        var selectedKeys = HistoryAccountList.SelectedItems
-            .OfType<SteamAccountHistoryItem>()
+        // 批量勾选集按账号键跨重建保留：先剔除已不存在的账号，再把勾选状态套用到（可能是新的）实例。
+        var liveKeys = source
             .Select(AccountHistoryService.GetAccountKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(selectSteamId))
+        _checkedKeys.IntersectWith(liveKeys);
+        foreach (var account in source)
         {
-            // 仅有 SteamID 字符串、无完整账号对象，故直接构造与 GetAccountKey 一致的 "id:" 键。
-            selectedKeys.Add($"id:{selectSteamId}");
+            account.IsSelected = _checkedKeys.Contains(AccountHistoryService.GetAccountKey(account));
         }
+
+        // 记住当前单选（详情焦点）的账号键，重建后恢复——后台资料同步等延迟刷新不应丢失当前查看的账号。
+        var activeKey = !string.IsNullOrWhiteSpace(selectSteamId)
+            ? $"id:{selectSteamId}"
+            : HistoryAccountList.SelectedItem is SteamAccountHistoryItem current
+                ? AccountHistoryService.GetAccountKey(current)
+                : null;
 
         _viewItems.Clear();
         foreach (var account in filtered)
@@ -127,33 +166,31 @@ public sealed partial class HistoryPage : Page
             _viewItems.Add(account);
         }
 
-        var toSelect = _viewItems
-            .Where(account => selectedKeys.Contains(AccountHistoryService.GetAccountKey(account)))
-            .ToList();
-        if (toSelect.Count <= 1)
-        {
-            HistoryAccountList.SelectedItem = toSelect.Count == 1 ? toSelect[0] : _viewItems.FirstOrDefault();
-        }
-        else
-        {
-            foreach (var account in toSelect)
-            {
-                HistoryAccountList.SelectedItems.Add(account);
-            }
-        }
+        var active = activeKey is null
+            ? null
+            : _viewItems.FirstOrDefault(account =>
+                string.Equals(AccountHistoryService.GetAccountKey(account), activeKey, StringComparison.OrdinalIgnoreCase));
+        HistoryAccountList.SelectedItem = active ?? _viewItems.FirstOrDefault();
 
-        var hasAny = source.Count > 0;
         HistoryEmptyPanel.Visibility = _viewItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        HistoryEmptyText.Text = hasAny ? "没有匹配的账号" : "暂无历史账号";
-        HistoryEmptyHintText.Text = hasAny
-            ? "换个关键词试试，或清空搜索框。"
-            : "成功登录或一键查询后会自动记录账号。";
-        HistorySummaryText.Text = hasAny
-            ? $"共 {source.Count} 个账号，登录或查询过的账号会自动记录在这里。"
-            : "登录或查询过的账号会自动记录在这里。";
+        UpdateSummaryTexts();
 
+        UpdateBatchBar();
         UpdateDetail();
         UpdateControlsEnabled();
+    }
+
+    /// <summary>按当前快照重算页头摘要与空状态文案（语言切换时也复用此处刷新已显示文本）。</summary>
+    private void UpdateSummaryTexts()
+    {
+        var hasAny = _allItems.Count > 0;
+        HistoryEmptyText.Text = hasAny ? Loc.T("History_Empty_NoMatch") : Loc.T("History_Empty_Title");
+        HistoryEmptyHintText.Text = hasAny
+            ? Loc.T("History_Empty_NoMatch_Hint")
+            : Loc.T("History_Empty_Hint");
+        HistorySummaryText.Text = hasAny
+            ? Loc.Tf("History_Subtitle_Count_Format", _allItems.Count)
+            : Loc.T("History_Subtitle");
     }
 
     private static bool Matches(SteamAccountHistoryItem account, string filter)
@@ -182,7 +219,7 @@ public sealed partial class HistoryPage : Page
     private void RefreshHistoryButton_Click(object sender, RoutedEventArgs e)
     {
         AppState.ReloadHistory(GetSelectedSteamId());
-        AppState.ShowStatus("历史账号已刷新。", InfoBarSeverity.Success);
+        AppState.ShowStatus(Loc.T("History_Status_Refreshed"), InfoBarSeverity.Success);
     }
 
     private void HistoryAccountList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -191,12 +228,11 @@ public sealed partial class HistoryPage : Page
         UpdateControlsEnabled();
     }
 
-    private void ExportHistoryButton_Click(object sender, RoutedEventArgs e)
+    private void ExportAccountsToClipboard(IReadOnlyList<SteamAccountHistoryItem> accounts)
     {
-        var accounts = GetSelectedAccounts();
         if (accounts.Count == 0)
         {
-            AppState.ShowStatus("请先选择要导出的账号（Ctrl/Shift 可多选）。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_NoneToExport"), InfoBarSeverity.Error);
             return;
         }
 
@@ -223,7 +259,7 @@ public sealed partial class HistoryPage : Page
         }
         catch (COMException)
         {
-            AppState.ShowStatus("写入剪贴板失败，请重试。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_ClipboardWriteFail"), InfoBarSeverity.Error);
             return;
         }
 
@@ -237,7 +273,9 @@ public sealed partial class HistoryPage : Page
         }
 
         AppState.ShowStatus(
-            $"已导出 {accounts.Count} 个账号到剪贴板（账户名----令牌，每行一个）。",
+            accounts.Count == 1
+                ? Loc.Tf("History_Status_Exported_One_Format", accounts[0].AccountTitle)
+                : Loc.Tf("History_Status_Exported_Many_Format", accounts.Count),
             InfoBarSeverity.Success);
     }
 
@@ -270,12 +308,12 @@ public sealed partial class HistoryPage : Page
             var (added, updated) = AppState.AccountHistoryService.ImportAccounts(selected);
             AppState.ReloadHistory(selected[0].SteamId);
             AppState.ShowStatus(
-                $"导入完成：新增 {added} 个，更新 {updated} 个，正在后台同步 Steam 资料...",
+                Loc.Tf("History_Status_ImportDone_Format", added, updated),
                 InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            AppState.ShowStatus($"导入失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("History_Status_ImportFail_Format", ex.Message), InfoBarSeverity.Error);
             return;
         }
         finally
@@ -291,7 +329,7 @@ public sealed partial class HistoryPage : Page
             if (refreshed > 0)
             {
                 AppState.ReloadHistory(GetSelectedSteamId());
-                AppState.ShowStatus($"Steam 资料同步完成（{refreshed} 个账号）。", InfoBarSeverity.Success);
+                AppState.ShowStatus(Loc.Tf("History_Status_ProfileSyncDone_Format", refreshed), InfoBarSeverity.Success);
             }
         }
         catch (Exception)
@@ -308,7 +346,7 @@ public sealed partial class HistoryPage : Page
             var content = Clipboard.GetContent();
             if (!content.Contains(StandardDataFormats.Text))
             {
-                AppState.ShowStatus("剪贴板中没有文本内容。", InfoBarSeverity.Error);
+                AppState.ShowStatus(Loc.T("History_Status_ClipboardNoText"), InfoBarSeverity.Error);
                 return null;
             }
 
@@ -316,7 +354,7 @@ public sealed partial class HistoryPage : Page
         }
         catch (COMException)
         {
-            AppState.ShowStatus("读取剪贴板失败，请重试。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_ClipboardReadFail"), InfoBarSeverity.Error);
             return null;
         }
 
@@ -325,8 +363,8 @@ public sealed partial class HistoryPage : Page
         {
             AppState.ShowStatus(
                 invalidCount > 0
-                    ? $"剪贴板中的 {invalidCount} 行都无法识别，需要“账户名----令牌”格式（每行一个）。"
-                    : "剪贴板中没有可导入的账号，需要“账户名----令牌”格式（每行一个）。",
+                    ? Loc.Tf("History_Status_ImportNoneRecognized_Format", invalidCount)
+                    : Loc.T("History_Status_ImportNone"),
                 InfoBarSeverity.Error);
             return null;
         }
@@ -338,8 +376,8 @@ public sealed partial class HistoryPage : Page
         }
 
         ImportDialogSummaryText.Text = invalidCount > 0
-            ? $"识别到 {entries.Count} 个账号（另有 {invalidCount} 行无法识别），勾选要导入的账号："
-            : $"识别到 {entries.Count} 个账号，勾选要导入的账号：";
+            ? Loc.Tf("History_ImportDialog_Summary_WithInvalid_Format", entries.Count, invalidCount)
+            : Loc.Tf("History_ImportDialog_Summary_Format", entries.Count);
         ImportDialogList.SelectAll();
 
         if (await ImportDialog.ShowAsync() != ContentDialogResult.Primary)
@@ -355,31 +393,30 @@ public sealed partial class HistoryPage : Page
         ImportDialog.IsPrimaryButtonEnabled = ImportDialogList.SelectedItems.Count > 0;
     }
 
-    private async void DeleteHistoryButton_Click(object sender, RoutedEventArgs e)
+    private async Task DeleteAccountsWithConfirmAsync(IReadOnlyList<SteamAccountHistoryItem> accounts)
     {
         if (_isDialogFlowActive)
         {
             return;
         }
 
-        var accounts = GetSelectedAccounts();
         if (accounts.Count == 0)
         {
-            AppState.ShowStatus("请先选择要删除的账号（Ctrl/Shift 可多选）。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_NoneToDelete"), InfoBarSeverity.Error);
             return;
         }
 
         var nameText = string.Join("、", accounts.Take(5).Select(account => account.AccountTitle));
         var summary = accounts.Count > 5
-            ? $"将删除 {nameText} 等 {accounts.Count} 个账号，仅移除本地记录与头像缓存。"
-            : $"将删除 {nameText}（共 {accounts.Count} 个），仅移除本地记录与头像缓存。";
+            ? Loc.Tf("History_Delete_Confirm_Many_Format", nameText, accounts.Count)
+            : Loc.Tf("History_Delete_Confirm_Few_Format", nameText, accounts.Count);
 
         var dialog = new ContentDialog
         {
-            Title = "删除历史账号",
+            Title = Loc.T("History_Delete_Dialog_Title"),
             Content = summary,
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
+            PrimaryButtonText = Loc.T("Common_Delete"),
+            CloseButtonText = Loc.T("Common_Cancel"),
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot
         };
@@ -392,18 +429,173 @@ public sealed partial class HistoryPage : Page
                 return;
             }
 
+            // 删除前把这些键移出批量选择集，避免重建后残留在已选状态。
+            foreach (var account in accounts)
+            {
+                _checkedKeys.Remove(AccountHistoryService.GetAccountKey(account));
+            }
+
             var removed = AppState.AccountHistoryService.DeleteAccounts(accounts);
             AppState.ReloadHistory();
-            AppState.ShowStatus($"已删除 {removed} 个历史账号。", InfoBarSeverity.Success);
+            AppState.ShowStatus(Loc.Tf("History_Status_Deleted_Format", removed), InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            AppState.ShowStatus($"删除失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("History_Status_DeleteFail_Format", ex.Message), InfoBarSeverity.Error);
         }
         finally
         {
             _isDialogFlowActive = false;
         }
+    }
+
+    // ---------- 卡片悬停 / 左上角勾选 / 单卡操作 ----------
+
+    private static SteamAccountHistoryItem? CardItem(object sender) =>
+        (sender as FrameworkElement)?.DataContext as SteamAccountHistoryItem;
+
+    private void HistoryCard_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (CardItem(sender) is { } account)
+        {
+            account.IsPointerOver = true;
+        }
+    }
+
+    private void HistoryCard_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (CardItem(sender) is { } account)
+        {
+            account.IsPointerOver = false;
+        }
+    }
+
+    private void HistoryCardCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardItem(sender) is not { } account)
+        {
+            return;
+        }
+
+        var key = AccountHistoryService.GetAccountKey(account);
+        if (account.IsSelected)
+        {
+            account.IsSelected = false;
+            _checkedKeys.Remove(key);
+        }
+        else
+        {
+            account.IsSelected = true;
+            _checkedKeys.Add(key);
+        }
+
+        UpdateBatchBar();
+    }
+
+    private async void CardQuickLoginButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardItem(sender) is not { } account)
+        {
+            return;
+        }
+
+        if (AppState.LoginPage is not { } loginPage)
+        {
+            AppState.ShowStatus(Loc.T("History_Status_LoginPageNotReady"), InfoBarSeverity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(account.AccountName))
+        {
+            AppState.ShowStatus(Loc.T("History_Status_MissingAccountName"), InfoBarSeverity.Error);
+            return;
+        }
+
+        var cancellationToken = AppState.BeginBusyOperation();
+        AppState.ShowStatus(Loc.Tf("History_Status_LoggingIn_Format", account.AccountTitle), InfoBarSeverity.Informational);
+        var progress = new Progress<string>(message => AppState.ShowStatus(message, InfoBarSeverity.Informational));
+
+        try
+        {
+            var result = await loginPage.QuickLoginAsync(
+                account.AccountName, account.EyaToken, progress, cancellationToken);
+            AppState.ReloadHistory(result.SteamId);
+            AppState.ShowStatus(
+                Loc.Tf("History_Status_LoginStarted_Format", account.AccountTitle, result.SteamId),
+                InfoBarSeverity.Success);
+        }
+        catch (OperationCanceledException)
+        {
+            AppState.ShowStatus(Loc.T("History_Status_LoginCanceled"), InfoBarSeverity.Informational);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("快速登录失败。", ex);
+            AppState.ShowStatus(Loc.Tf("History_Status_LoginFail_Format", ex.Message, AppLog.LogFilePath), InfoBarSeverity.Error);
+        }
+        finally
+        {
+            AppState.EndBusyOperation();
+        }
+    }
+
+    private void CardExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardItem(sender) is { } account)
+        {
+            ExportAccountsToClipboard(new[] { account });
+        }
+    }
+
+    private async void CardDeleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardItem(sender) is { } account)
+        {
+            await DeleteAccountsWithConfirmAsync(new[] { account });
+        }
+    }
+
+    // ---------- 底部批量操作栏（勾选任意卡片后浮现，操作针对全部已勾选账号） ----------
+
+    // 只作用于当前可见（已过滤）列表：避免搜索过滤下对看不见的勾选项执行批量删除/导出。
+    // 被过滤隐藏的勾选项仍保留在 _checkedKeys，清空搜索后会重新出现并计入。
+    private List<SteamAccountHistoryItem> GetCheckedAccounts() =>
+        _viewItems
+            .Where(account => _checkedKeys.Contains(AccountHistoryService.GetAccountKey(account)))
+            .ToList();
+
+    private void UpdateBatchBar()
+    {
+        // 计数与 GetCheckedAccounts 同口径（可见集），保证"已选 N 项"与批量操作实际作用集一致。
+        var count = GetCheckedAccounts().Count;
+        BatchActionBar.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        BatchSelectionText.Text = Loc.Tf("Common_Selected_Format", count);
+    }
+
+    private void ClearCheckedSelection()
+    {
+        _checkedKeys.Clear();
+        foreach (var account in _allItems)
+        {
+            account.IsSelected = false;
+        }
+
+        UpdateBatchBar();
+    }
+
+    private void BatchClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        ClearCheckedSelection();
+    }
+
+    private void BatchExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        ExportAccountsToClipboard(GetCheckedAccounts());
+    }
+
+    private async void BatchDeleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        await DeleteAccountsWithConfirmAsync(GetCheckedAccounts());
     }
 
     private async void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
@@ -416,16 +608,16 @@ public sealed partial class HistoryPage : Page
         var total = AppState.HistoryAccounts.Count;
         if (total == 0)
         {
-            AppState.ShowStatus("没有可清空的历史账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_NoneToClear"), InfoBarSeverity.Error);
             return;
         }
 
         var dialog = new ContentDialog
         {
-            Title = "清空历史账号",
-            Content = $"将清空全部 {total} 个历史账号并删除头像缓存，此操作不可恢复。",
-            PrimaryButtonText = "清空",
-            CloseButtonText = "取消",
+            Title = Loc.T("History_ClearAll_Dialog_Title"),
+            Content = Loc.Tf("History_ClearAll_Dialog_Content_Format", total),
+            PrimaryButtonText = Loc.T("Common_Clear"),
+            CloseButtonText = Loc.T("Common_Cancel"),
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot
         };
@@ -440,15 +632,148 @@ public sealed partial class HistoryPage : Page
 
             var cleared = AppState.AccountHistoryService.ClearAll();
             AppState.ReloadHistory();
-            AppState.ShowStatus($"已清空 {cleared} 个历史账号。", InfoBarSeverity.Success);
+            AppState.ShowStatus(Loc.Tf("History_Status_Cleared_Format", cleared), InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            AppState.ShowStatus($"清空失败：{ex.Message}", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.Tf("History_Status_ClearFail_Format", ex.Message), InfoBarSeverity.Error);
         }
         finally
         {
             _isDialogFlowActive = false;
+        }
+    }
+
+    private async void ClearInvalidAccountsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isDialogFlowActive)
+        {
+            return;
+        }
+
+        var accounts = AppState.HistoryAccounts.ToList();
+        if (accounts.Count == 0)
+        {
+            AppState.ShowStatus(Loc.T("History_Status_NoneToTest"), InfoBarSeverity.Error);
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = Loc.T("History_ClearInvalid_Dialog_Title"),
+            Content = Loc.Tf("History_ClearInvalid_Dialog_Content_Format", accounts.Count) +
+                Environment.NewLine + Environment.NewLine +
+                Loc.T("History_ClearInvalid_Dialog_Content_Note"),
+            PrimaryButtonText = Loc.T("History_ClearInvalid_Dialog_Primary"),
+            CloseButtonText = Loc.T("Common_Cancel"),
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot
+        };
+
+        _isDialogFlowActive = true;
+        try
+        {
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            {
+                return;
+            }
+        }
+        finally
+        {
+            _isDialogFlowActive = false;
+        }
+
+        // 测试期间复用全局忙碌+取消机制（取消按钮可中断）；网络错误或取消时全程不删除任何账号，
+        // 仅在完整测试通过后才一次性删除被 Steam 拒绝（含令牌畸形/过期）的账号。
+        var cancellationToken = AppState.BeginBusyOperation();
+        var invalid = new List<SteamAccountHistoryItem>();
+        var tested = 0;
+        string? networkError = null;
+        var canceled = false;
+
+        try
+        {
+            foreach (var account in accounts)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    canceled = true;
+                    break;
+                }
+
+                AppState.ShowStatus(
+                    Loc.Tf("History_Status_Testing_Format", tested + 1, accounts.Count, account.AccountTitle),
+                    InfoBarSeverity.Informational);
+
+                SteamTokenOnlineValidationResult result;
+                try
+                {
+                    result = await AppState.TokenOnlineValidationService.ValidateAsync(
+                        account.EyaToken, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    canceled = true;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // 网络错误（CM 不可达/超时等）：立即停止，不删除任何账号。
+                    networkError = ex.Message;
+                    break;
+                }
+
+                tested++;
+                if (!result.IsValid)
+                {
+                    invalid.Add(account);
+                }
+            }
+
+            // 无论是完整跑完、遇网络错误还是被取消，已确认被 Steam 拒绝的账号都照删；
+            // 停止只是不再测试剩余账号（未测试的账号一律保留）。
+            var removed = invalid.Count > 0
+                ? AppState.AccountHistoryService.DeleteAccounts(invalid)
+                : 0;
+            if (removed > 0)
+            {
+                AppState.ReloadHistory();
+            }
+
+            if (networkError is not null)
+            {
+                AppLog.Warn($"批量测试历史账号时遇到网络错误，已停止：{networkError}");
+                AppState.ShowStatus(
+                    removed > 0
+                        ? Loc.Tf("History_Status_TestNetworkErr_WithRemoved_Format", tested, networkError, removed)
+                        : Loc.Tf("History_Status_TestNetworkErr_Format", tested, networkError),
+                    InfoBarSeverity.Error);
+                return;
+            }
+
+            if (canceled)
+            {
+                AppState.ShowStatus(
+                    removed > 0
+                        ? Loc.Tf("History_Status_TestCanceled_WithRemoved_Format", tested, removed)
+                        : Loc.Tf("History_Status_TestCanceled_Format", tested),
+                    InfoBarSeverity.Informational);
+                return;
+            }
+
+            AppState.ShowStatus(
+                removed > 0
+                    ? Loc.Tf("History_Status_TestDone_WithRemoved_Format", tested, removed)
+                    : Loc.Tf("History_Status_TestDone_AllValid_Format", tested),
+                InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            AppState.ShowStatus(Loc.Tf("History_Status_ClearInvalidFail_Format", ex.Message), InfoBarSeverity.Error);
+        }
+        finally
+        {
+            AppState.EndBusyOperation();
         }
     }
 
@@ -538,7 +863,7 @@ public sealed partial class HistoryPage : Page
 
         accountName = "";
         token = "";
-        info = new JwtTokenInfo(null, null, false, "无法识别", null);
+        info = new JwtTokenInfo(null, null, false, Loc.T("Jwt_Status_Unrecognized"), null);
         return false;
     }
 
@@ -573,40 +898,35 @@ public sealed partial class HistoryPage : Page
         }
     }
 
-    private List<SteamAccountHistoryItem> GetSelectedAccounts()
-    {
-        return HistoryAccountList.SelectedItems.OfType<SteamAccountHistoryItem>().ToList();
-    }
-
     private async void OneClickHistoryQueryButton_Click(object sender, RoutedEventArgs e)
     {
         if (HistoryAccountList.SelectedItem is not SteamAccountHistoryItem account)
         {
-            AppState.ShowStatus("请选择历史账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_SelectAccount"), InfoBarSeverity.Error);
             return;
         }
 
         if (AppState.LoginPage is not { } loginPage)
         {
-            AppState.ShowStatus("登录页尚未初始化，请先打开登录页。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_LoginPageNotReady"), InfoBarSeverity.Error);
             return;
         }
 
         // 与登录页统一走可取消的忙碌机制：一键查询最长可达上百秒，必须能被取消按钮中断。
         var cancellationToken = AppState.BeginBusyOperation();
-        AppState.ShowStatus($"正在一键查询 {account.AccountTitle} 的账号状态...", InfoBarSeverity.Informational);
+        AppState.ShowStatus(Loc.Tf("History_Status_Querying_Format", account.AccountTitle), InfoBarSeverity.Informational);
 
         try
         {
             var score = await loginPage.QueryAndSaveCsStatusAsync(
                 account.AccountName, account.EyaToken, cancellationToken);
             AppState.ShowStatus(
-                $"{account.AccountTitle} 查询完成：优先分 {score.DisplayText}，CS2等级 {score.PlayerLevelText}，冷却 {score.CooldownText}，GC VAC {score.GcVacText}。",
+                Loc.Tf("History_Status_QueryDone_Format", account.AccountTitle, score.DisplayText, score.PlayerLevelText, score.CooldownText, score.GcVacText),
                 InfoBarSeverity.Success);
         }
         catch (OperationCanceledException)
         {
-            AppState.ShowStatus("已取消一键查询。", InfoBarSeverity.Informational);
+            AppState.ShowStatus(Loc.T("History_Status_QueryCanceled"), InfoBarSeverity.Informational);
         }
         catch (Exception ex)
         {
@@ -622,7 +942,7 @@ public sealed partial class HistoryPage : Page
     {
         if (HistoryAccountList.SelectedItem is not SteamAccountHistoryItem account)
         {
-            AppState.ShowStatus("请选择历史账号。", InfoBarSeverity.Error);
+            AppState.ShowStatus(Loc.T("History_Status_SelectAccount"), InfoBarSeverity.Error);
             return;
         }
 
@@ -643,36 +963,19 @@ public sealed partial class HistoryPage : Page
             return;
         }
 
-        var selectedCount = HistoryAccountList.SelectedItems.Count;
-        if (selectedCount > 1)
-        {
-            HistoryDetailAvatar.ProfilePicture = null;
-            HistoryDetailAvatar.DisplayName = "多选";
-            HistoryDetailAccountNameText.Text = $"已选择 {selectedCount} 个账号";
-            HistoryDetailPersonaText.Text = "可批量导出或删除";
-            HistoryDetailSteamIdText.Text = "—";
-            HistoryDetailTokenExpiresText.Text = "—";
-            HistoryDetailLastLoginText.Text = "—";
-            HistoryDetailCompetitiveScoreText.Text = "—";
-            HistoryDetailCsLevelText.Text = "—";
-            HistoryDetailCooldownStatusText.Text = "—";
-            HistoryDetailAccountStatusText.Text = "—";
-            return;
-        }
-
         if (HistoryAccountList.SelectedItem is not SteamAccountHistoryItem account)
         {
             HistoryDetailAvatar.ProfilePicture = null;
-            HistoryDetailAvatar.DisplayName = "未选择";
-            HistoryDetailAccountNameText.Text = "未选择账号";
-            HistoryDetailPersonaText.Text = "Steam 资料未同步";
-            HistoryDetailSteamIdText.Text = "未解析";
-            HistoryDetailTokenExpiresText.Text = "未解析";
-            HistoryDetailLastLoginText.Text = "暂无记录";
-            HistoryDetailCompetitiveScoreText.Text = "待查询";
-            HistoryDetailCsLevelText.Text = "待查询";
-            HistoryDetailCooldownStatusText.Text = "待查询";
-            HistoryDetailAccountStatusText.Text = "待查询";
+            HistoryDetailAvatar.DisplayName = Loc.T("History_Detail_Unselected");
+            HistoryDetailAccountNameText.Text = Loc.T("History_Detail_NoAccountSelected");
+            HistoryDetailPersonaText.Text = Loc.T("History_Detail_ProfileNotSynced");
+            HistoryDetailSteamIdText.Text = Loc.T("History_Detail_Unparsed");
+            HistoryDetailTokenExpiresText.Text = Loc.T("History_Detail_Unparsed");
+            HistoryDetailLastLoginText.Text = Loc.T("History_Detail_NoRecord");
+            HistoryDetailCompetitiveScoreText.Text = Loc.T("History_Detail_Pending");
+            HistoryDetailCsLevelText.Text = Loc.T("History_Detail_Pending");
+            HistoryDetailCooldownStatusText.Text = Loc.T("History_Detail_Pending");
+            HistoryDetailAccountStatusText.Text = Loc.T("History_Detail_Pending");
             return;
         }
 
@@ -692,22 +995,20 @@ public sealed partial class HistoryPage : Page
     private void UpdateControlsEnabled()
     {
         var isBusy = AppState.IsBusy;
-        var selectedCount = HistoryAccountList.SelectedItems.Count;
+        var hasActive = HistoryAccountList.SelectedItem is SteamAccountHistoryItem;
         HistoryAccountList.IsEnabled = !isBusy && _viewItems.Count > 0;
         RefreshHistoryButton.IsEnabled = !isBusy;
         HistorySearchBox.IsEnabled = !isBusy;
         ImportHistoryButton.IsEnabled = !isBusy;
-        ExportHistoryButton.IsEnabled = !isBusy && selectedCount > 0;
-        DeleteHistoryButton.IsEnabled = !isBusy && selectedCount > 0;
         ClearHistoryButton.IsEnabled = !isBusy && AppState.HistoryAccounts.Count > 0;
-        OneClickHistoryQueryButton.IsEnabled = !isBusy && selectedCount == 1;
-        UseHistoryAccountButton.IsEnabled = !isBusy && selectedCount == 1;
+        ClearInvalidAccountsButton.IsEnabled = !isBusy && AppState.HistoryAccounts.Count > 0;
+        OneClickHistoryQueryButton.IsEnabled = !isBusy && hasActive;
+        UseHistoryAccountButton.IsEnabled = !isBusy && hasActive;
+        BatchClearButton.IsEnabled = !isBusy;
+        BatchExportButton.IsEnabled = !isBusy;
+        BatchDeleteButton.IsEnabled = !isBusy;
 
         // 取消按钮仅忙碌时出现且保持可用，让用户中断本页发起的一键查询。
         CancelHistoryQueryButton.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
-
-        SelectionHintText.Text = selectedCount > 1
-            ? $"已选 {selectedCount} 项"
-            : "Ctrl/Shift 可多选";
     }
 }

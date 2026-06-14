@@ -17,19 +17,19 @@
 
             <StackPanel x:Name="FormPanel" Spacing="20">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="登录" Style="{StaticResource PageTitleTextStyle}" />
+                    <TextBlock Text="{x:Bind Strings.Get('Login_Title'), Mode=OneWay}" Style="{StaticResource PageTitleTextStyle}" />
                     <TextBlock
-                        Text="使用 EYA 令牌登录 Steam，或输入卡密自动解析账号。"
+                        Text="{x:Bind Strings.Get('Login_Subtitle'), Mode=OneWay}"
                         Style="{StaticResource PageSubtitleTextStyle}" />
                 </StackPanel>
 
                 <SelectorBar x:Name="ModeSelector" SelectionChanged="ModeSelector_SelectionChanged">
-                    <SelectorBarItem x:Name="ManualModeItem" Text="手动模式">
+                    <SelectorBarItem x:Name="ManualModeItem" Text="{x:Bind Strings.Get('Login_Mode_Manual'), Mode=OneWay}">
                         <SelectorBarItem.Icon>
                             <FontIcon Glyph="&#xE70F;" />
                         </SelectorBarItem.Icon>
                     </SelectorBarItem>
-                    <SelectorBarItem x:Name="AutoModeItem" Text="自动模式">
+                    <SelectorBarItem x:Name="AutoModeItem" Text="{x:Bind Strings.Get('Login_Mode_Auto'), Mode=OneWay}">
                         <SelectorBarItem.Icon>
                             <FontIcon Glyph="&#xE945;" />
                         </SelectorBarItem.Icon>
@@ -38,12 +38,12 @@
 
                 <Border x:Name="ManualPanel" Style="{StaticResource CardBorderStyle}">
                     <StackPanel Spacing="14">
-                        <TextBlock Text="手动输入凭据" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Text="{x:Bind Strings.Get('Login_Manual_Section'), Mode=OneWay}" Style="{StaticResource SectionTitleTextStyle}" />
 
                         <TextBox
                             x:Name="AccountNameBox"
-                            Header="账户名称"
-                            PlaceholderText="输入 Steam 账户名称"
+                            Header="{x:Bind Strings.Get('Login_Field_AccountName'), Mode=OneWay}"
+                            PlaceholderText="{x:Bind Strings.Get('Login_Field_AccountName_Placeholder'), Mode=OneWay}"
                             IsSpellCheckEnabled="False"
                             TextChanged="ManualCredentialBox_TextChanged"
                             KeyDown="AccountNameBox_KeyDown" />
@@ -51,8 +51,8 @@
                         <TextBox
                             x:Name="EyaTokenBox"
                             Height="150"
-                            Header="EYA 令牌"
-                            PlaceholderText="粘贴 EYA 令牌（以 eyAi 开头的 JWT）"
+                            Header="{x:Bind Strings.Get('Login_Field_EyaToken'), Mode=OneWay}"
+                            PlaceholderText="{x:Bind Strings.Get('Login_Field_EyaToken_Placeholder'), Mode=OneWay}"
                             AcceptsReturn="True"
                             TextWrapping="Wrap"
                             IsSpellCheckEnabled="False"
@@ -63,12 +63,12 @@
 
                 <Border x:Name="AutoPanel" Style="{StaticResource CardBorderStyle}" Visibility="Collapsed">
                     <StackPanel Spacing="14">
-                        <TextBlock Text="卡密解析" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Text="{x:Bind Strings.Get('Login_Auto_Section'), Mode=OneWay}" Style="{StaticResource SectionTitleTextStyle}" />
 
                         <ComboBox
                             x:Name="UpstreamServerBox"
                             HorizontalAlignment="Stretch"
-                            Header="上游服务器"
+                            Header="{x:Bind Strings.Get('Login_Field_UpstreamServer'), Mode=OneWay}"
                             SelectionChanged="UpstreamServerBox_SelectionChanged">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="services:SteamUpstreamServer">
@@ -79,8 +79,8 @@
 
                         <TextBox
                             x:Name="LicenseKeyBox"
-                            Header="卡密"
-                            PlaceholderText="输入卡密后按 Enter 解析"
+                            Header="{x:Bind Strings.Get('Login_Field_LicenseKey'), Mode=OneWay}"
+                            PlaceholderText="{x:Bind Strings.Get('Login_Field_LicenseKey_Placeholder'), Mode=OneWay}"
                             IsSpellCheckEnabled="False"
                             TextChanged="LicenseKeyBox_TextChanged"
                             KeyDown="LicenseKeyBox_KeyDown" />
@@ -93,9 +93,9 @@
 
                             <TextBox
                                 x:Name="ResolvedAccountBox"
-                                Header="解析账户"
+                                Header="{x:Bind Strings.Get('Login_Field_ResolvedAccount'), Mode=OneWay}"
                                 IsReadOnly="True"
-                                PlaceholderText="未解析" />
+                                PlaceholderText="{x:Bind Strings.Get('Login_Value_NotResolved'), Mode=OneWay}" />
 
                             <Button
                                 x:Name="ResolveLicenseButton"
@@ -105,7 +105,7 @@
                                 Click="ResolveLicenseButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE721;" FontSize="16" />
-                                    <TextBlock Text="解析卡密" />
+                                    <TextBlock Text="{x:Bind Strings.Get('Login_Btn_ResolveLicense'), Mode=OneWay}" />
                                 </StackPanel>
                             </Button>
                         </Grid>
@@ -127,10 +127,10 @@
                         HorizontalAlignment="Stretch"
                         Padding="0,10"
                         Click="ClearWorkshopButton_Click"
-                        ToolTipService.ToolTip="取消该账号在 CS2（AppID 730）的全部创意工坊订阅">
+                        ToolTipService.ToolTip="{x:Bind Strings.Get('Login_Btn_ClearWorkshop_Tip'), Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE74D;" FontSize="16" />
-                            <TextBlock Text="清除创意工坊订阅" />
+                            <TextBlock Text="{x:Bind Strings.Get('Login_Btn_ClearWorkshop'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
 
@@ -143,21 +143,22 @@
                         Click="LoginButton_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE8D4;" FontSize="16" />
-                            <TextBlock Text="登录到 Steam" />
+                            <TextBlock Text="{x:Bind Strings.Get('Login_Btn_Login'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
 
+                    <!-- 一键装配（用“配装”页保存的预设 + 当前账号 token），取代原“装备 R8”。 -->
                     <Button
-                        x:Name="EquipR8Button"
+                        x:Name="ApplyLoadoutButton"
                         Grid.Row="1"
                         Grid.ColumnSpan="2"
                         HorizontalAlignment="Stretch"
                         Padding="0,10"
-                        Click="EquipR8Button_Click"
-                        ToolTipService.ToolTip="将 R8 左轮加入 T/CT 配装">
+                        Click="ApplyLoadoutButton_Click"
+                        ToolTipService.ToolTip="{x:Bind Strings.Get('Login_Btn_ApplyLoadout_Tip'), Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE945;" FontSize="16" />
-                            <TextBlock Text="装备 R8 到 CT/T 配装" />
+                            <FontIcon Glyph="&#xE7C1;" FontSize="16" />
+                            <TextBlock Text="{x:Bind Strings.Get('Login_Btn_ApplyLoadout'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -169,27 +170,25 @@
                     Padding="0,10"
                     Visibility="Collapsed"
                     Click="CancelButton_Click"
-                    ToolTipService.ToolTip="取消当前正在进行的操作">
+                    ToolTipService.ToolTip="{x:Bind Strings.Get('Login_Btn_Cancel_Tip'), Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE711;" FontSize="16" />
-                        <TextBlock Text="取消" />
+                        <TextBlock Text="{x:Bind Strings.Get('Common_Cancel'), Mode=OneWay}" />
                     </StackPanel>
                 </Button>
             </StackPanel>
 
             <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" VerticalAlignment="Top">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="账号信息" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Text="{x:Bind Strings.Get('Login_AccountInfo_Section'), Mode=OneWay}" Style="{StaticResource SectionTitleTextStyle}" />
 
                     <StackPanel Spacing="8" HorizontalAlignment="Center">
                         <PersonPicture
                             x:Name="AccountInfoAvatar"
                             Width="76"
-                            Height="76"
-                            DisplayName="未填写" />
+                            Height="76" />
                         <TextBlock
                             x:Name="AccountInfoPersonaText"
-                            Text="Steam 昵称未同步"
                             HorizontalAlignment="Center"
                             TextWrapping="Wrap"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -212,11 +211,10 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="用户名" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Text="{x:Bind Strings.Get('Login_Label_UserName'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoUserText"
                             Grid.Column="1"
-                            Text="未填写"
                             Style="{StaticResource FieldValueTextStyle}" />
 
                         <TextBlock Grid.Row="1" Text="Steam64" Style="{StaticResource FieldLabelTextStyle}" />
@@ -224,48 +222,42 @@
                             x:Name="AccountInfoSteamIdText"
                             Grid.Row="1"
                             Grid.Column="1"
-                            Text="未解析"
                             IsTextSelectionEnabled="True"
                             Style="{StaticResource FieldValueTextStyle}" />
 
-                        <TextBlock Grid.Row="2" Text="JWT 过期" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="2" Text="{x:Bind Strings.Get('Login_Label_JwtExpires'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoExpiresText"
                             Grid.Row="2"
                             Grid.Column="1"
-                            Text="未解析"
                             Style="{StaticResource FieldValueTextStyle}" />
 
-                        <TextBlock Grid.Row="3" Text="可用状态" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="3" Text="{x:Bind Strings.Get('Login_Label_Availability'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoAvailabilityText"
                             Grid.Row="3"
                             Grid.Column="1"
-                            Text="未验证"
                             Style="{StaticResource FieldValueTextStyle}" />
 
-                        <TextBlock Grid.Row="4" Text="优先分数" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="4" Text="{x:Bind Strings.Get('Login_Label_PremierScore'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoPremierScoreText"
                             Grid.Row="4"
                             Grid.Column="1"
-                            Text="未查询"
                             Style="{StaticResource FieldValueTextStyle}" />
 
-                        <TextBlock Grid.Row="5" Text="CS2 等级" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="5" Text="{x:Bind Strings.Get('Login_Label_CsLevel'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoCsLevelText"
                             Grid.Row="5"
                             Grid.Column="1"
-                            Text="未查询"
                             Style="{StaticResource FieldValueTextStyle}" />
 
-                        <TextBlock Grid.Row="6" Text="冷却状态" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="6" Text="{x:Bind Strings.Get('Login_Label_Cooldown'), Mode=OneWay}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock
                             x:Name="AccountInfoCooldownStatusText"
                             Grid.Row="6"
                             Grid.Column="1"
-                            Text="未查询"
                             Style="{StaticResource FieldValueTextStyle}" />
                     </Grid>
 
@@ -273,10 +265,10 @@
                         x:Name="OneClickQueryButton"
                         HorizontalAlignment="Stretch"
                         Click="OneClickQueryButton_Click"
-                        ToolTipService.ToolTip="验证令牌并查询优先分、CS2 等级与冷却状态">
+                        ToolTipService.ToolTip="{x:Bind Strings.Get('Login_Btn_OneClickQuery_Tip'), Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE9D9;" FontSize="16" />
-                            <TextBlock Text="一键查询" />
+                            <TextBlock Text="{x:Bind Strings.Get('Common_OneClickQuery'), Mode=OneWay}" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

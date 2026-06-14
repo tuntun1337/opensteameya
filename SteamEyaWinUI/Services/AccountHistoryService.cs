@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -94,12 +95,12 @@ internal sealed class AccountHistoryService
 
         if (string.IsNullOrWhiteSpace(accountName))
         {
-            throw new ArgumentException("账户名称不能为空。", nameof(accountName));
+            throw new ArgumentException(Loc.T("Account_Error_AccountNameEmpty"), nameof(accountName));
         }
 
         if (string.IsNullOrWhiteSpace(eyaToken))
         {
-            throw new ArgumentException("EYA 令牌不能为空。", nameof(eyaToken));
+            throw new ArgumentException(Loc.T("Account_Error_EyaTokenEmpty"), nameof(eyaToken));
         }
 
         // 传入预取资料即跳过对应的网络抓取。
@@ -533,7 +534,7 @@ internal sealed class AccountHistoryService
         {
             AppLog.Error("账号历史文件存在但无法读取，已中止本次保存以避免覆盖丢失数据。", ex);
             throw new InvalidOperationException(
-                "账号历史文件暂时无法读取（可能被杀软或云同步占用），本次操作已取消，未改动任何数据，请稍后重试。",
+                Loc.T("Account_Error_HistoryFileUnreadable"),
                 ex);
         }
     }

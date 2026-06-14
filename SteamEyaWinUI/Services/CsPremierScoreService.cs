@@ -1,4 +1,5 @@
 using System.Globalization;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -31,7 +32,7 @@ internal sealed class CsPremierScoreService
     {
         if (!ulong.TryParse(steamId, CultureInfo.InvariantCulture, out var steamId64))
         {
-            throw new InvalidOperationException("Steam64 格式不正确，无法查询优先分。");
+            throw new InvalidOperationException(Loc.T("Cs_Premier_BadSteam64"));
         }
 
         var accountId = CsGcSession.GetAccountId(steamId64);
@@ -197,7 +198,7 @@ internal sealed class CsPremierScoreService
 
         if (profile is null)
         {
-            throw new InvalidOperationException("CS2 GC 没有返回账号 Profile。");
+            throw new InvalidOperationException(Loc.T("Cs_Premier_NoProfile"));
         }
 
         return profile;

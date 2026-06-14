@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SteamEyaWinUI.Localization;
 using SteamEyaWinUI.Models;
 
 namespace SteamEyaWinUI.Services;
@@ -26,7 +27,7 @@ internal sealed class GitHubUpdateService
             releaseStream,
             GitHubUpdateJsonContext.Default.GitHubReleaseDto,
             cancellationToken)
-            ?? throw new InvalidOperationException("GitHub Release 响应为空。");
+            ?? throw new InvalidOperationException(Loc.T("Update_EmptyResponse"));
 
         var metadataAsset = release.Assets.FirstOrDefault(asset =>
             string.Equals(asset.Name, "latest.json", StringComparison.OrdinalIgnoreCase));

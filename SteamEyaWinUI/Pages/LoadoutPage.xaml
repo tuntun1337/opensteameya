@@ -1,0 +1,79 @@
+<Page
+    x:Class="SteamEyaWinUI.Pages.LoadoutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:SteamEyaWinUI.Models"
+    xmlns:imaging="using:Microsoft.UI.Xaml.Media.Imaging"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <!-- 可选武器（未装备）：小条，可拖拽到上方格子。 -->
+        <DataTemplate x:Key="PoolTileTemplate" x:DataType="models:LoadoutWeaponTile">
+            <Grid Width="150" Height="32" Margin="0,0,6,6" Background="Transparent">
+                <Border CornerRadius="4" Background="#FF202B3A" BorderThickness="1" BorderBrush="#FF3A4658" />
+                <StackPanel Orientation="Horizontal" Spacing="6" Padding="6,0" VerticalAlignment="Center">
+                    <Image Width="42" Height="18" Stretch="Uniform">
+                        <Image.Source>
+                            <imaging:SvgImageSource UriSource="{x:Bind IconUri}" />
+                        </Image.Source>
+                    </Image>
+                    <TextBlock Text="{x:Bind DisplayName}" FontSize="11" Foreground="#FFCDCDCD" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="32,24,32,16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="{x:Bind Strings.Get('Loadout_Title'), Mode=OneWay}" Style="{StaticResource PageTitleTextStyle}" />
+            <TextBlock
+                Text="{x:Bind Strings.Get('Loadout_Subtitle'), Mode=OneWay}"
+                Style="{StaticResource PageSubtitleTextStyle}" />
+        </StackPanel>
+
+        <SelectorBar Grid.Row="1" x:Name="TeamSelector" SelectionChanged="TeamSelector_SelectionChanged">
+            <SelectorBarItem x:Name="TeamTItem" Text="{x:Bind Strings.Get('Loadout_Team_T'), Mode=OneWay}" IsSelected="True" />
+            <SelectorBarItem x:Name="TeamCtItem" Text="{x:Bind Strings.Get('Loadout_Team_Ct'), Mode=OneWay}" />
+        </SelectorBar>
+
+        <Grid Grid.Row="2" RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 装备区：三列等高，格子按星形行拉伸填满 → 各列最后一行底部对齐（复刻 CS2）。代码里填充格子。 -->
+            <Grid Grid.Row="0" x:Name="EquippedGrid" ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid x:Name="Col0Host" Grid.Column="0" VerticalAlignment="Stretch" />
+                <Grid x:Name="Col1Host" Grid.Column="1" VerticalAlignment="Stretch" />
+                <Grid x:Name="Col2Host" Grid.Column="2" VerticalAlignment="Stretch" />
+            </Grid>
+
+            <!-- 可选武器池（未装备的，按阵营）。 -->
+            <StackPanel Grid.Row="1" Spacing="6">
+                <TextBlock Text="{x:Bind Strings.Get('Loadout_PoolHint'), Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <GridView
+                    x:Name="PoolGrid"
+                    MaxHeight="160"
+                    SelectionMode="None"
+                    IsItemClickEnabled="False"
+                    CanDragItems="True"
+                    CanReorderItems="False"
+                    AllowDrop="False"
+                    DragItemsStarting="PoolGrid_DragItemsStarting"
+                    ItemTemplate="{StaticResource PoolTileTemplate}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

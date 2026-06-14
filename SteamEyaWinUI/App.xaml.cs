@@ -1,4 +1,6 @@
 using Microsoft.UI.Xaml;
+using SteamEyaWinUI.Localization;
+using SteamEyaWinUI.Services;
 
 namespace SteamEyaWinUI;
 
@@ -14,6 +16,9 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // 在任何窗口/页面构造前确定界面语言，保证首帧即用所选语言渲染。
+        Loc.Initialize(AppState.SettingsService);
+
         _window = new MainWindow();
         _window.Activate();
     }
